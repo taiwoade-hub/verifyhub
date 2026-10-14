@@ -1,0 +1,10 @@
+name: aurora-notes
+
+verification:
+  engine: kane
+  instructions:
+    - Open homepage
+    - Test navigation
+
+notifications:
+  telegram: false

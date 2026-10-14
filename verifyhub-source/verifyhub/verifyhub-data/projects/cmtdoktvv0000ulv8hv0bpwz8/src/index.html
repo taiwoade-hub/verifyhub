@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Aurora Notes — Simple notes that stay in your browser</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: ui-sans-serif, system-ui, sans-serif; background: #fafaf9; color: #1c1917; }
+    header { display: flex; align-items: center; gap: 16px; padding: 18px 28px; border-bottom: 1px solid #e7e5e4; }
+    .logo { width: 28px; height: 28px; border-radius: 8px; background: #0f766e; display: grid; place-items: center; color: #fff; font-weight: 700; }
+    nav a { margin-left: 18px; color: #44403c; text-decoration: none; font-size: 14px; }
+    nav a:hover { color: #0f766e; }
+    main { max-width: 760px; margin: 0 auto; padding: 48px 24px; }
+    h1 { font-size: 34px; margin: 0 0 12px; }
+    p.lead { color: #57534e; font-size: 16px; line-height: 1.6; }
+    .panel { margin-top: 28px; border: 1px solid #e7e5e4; border-radius: 12px; background: #fff; padding: 20px; }
+    input { width: 100%; padding: 10px 12px; border: 1px solid #d6d3d1; border-radius: 8px; font-size: 14px; }
+    button { margin-top: 10px; background: #0f766e; color: #fff; border: 0; border-radius: 8px; padding: 10px 16px; font-size: 14px; cursor: pointer; }
+    ul { padding-left: 18px; }
+    footer { padding: 24px 28px; color: #78716c; font-size: 13px; border-top: 1px solid #e7e5e4; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">A</div>
+    <strong>Aurora Notes</strong>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/features.html">Features</a>
+      <a href="/about.html">About</a>
+    </nav>
+  </header>
+  <main>
+    <h1>Notes that stay in your browser</h1>
+    <p class="lead">Aurora Notes is a tiny offline-first notepad. Everything you type is stored locally — no accounts, no servers, no tracking.</p>
+    <div class="panel">
+      <label for="note"><strong>Quick note</strong></label>
+      <input id="note" placeholder="Write something…" />
+      <button onclick="save()">Save note</button>
+      <ul id="notes"></ul>
+    </div>
+  </main>
+  <footer>Aurora Notes · static example shipped with VerifyHub</footer>
+  <script>
+    function render() {
+      const notes = JSON.parse(localStorage.getItem('aurora-notes') || '[]')
+      document.getElementById('notes').innerHTML = notes.map(n => '<li>' + n + '</li>').join('')
+    }
+    function save() {
+      const el = document.getElementById('note')
+      if (!el.value.trim()) return
+      const notes = JSON.parse(localStorage.getItem('aurora-notes') || '[]')
+      notes.push(el.value.trim())
+      localStorage.setItem('aurora-notes', JSON.stringify(notes))
+      el.value = ''
+      render()
+    }
+    render()
+  </script>
+</body>
+</html>

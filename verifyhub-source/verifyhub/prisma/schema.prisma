@@ -1,0 +1,182 @@
+// VerifyHub — database schema
+// Adapted from the PostgreSQL domain model to SQLite (sandbox constraint).
+// The domain is identical: projects → runs → events/logs/evidence, plus
+// schedules, integrations, notifications and webhook audit.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id                     String   @id @default(cuid())
+  name                   String
+  description            String?
+  sourceType             String   // github | upload | url | example
+  sourceUrl              String?  // repo URL or live URL
+  gitRepo                String?  // owner/name
+  gitBranch              String?
+  gitCommit              String?
+  localPath              String?  // workspace path holding the project files
+  detectedLanguage       String?
+  detectedFramework      String?
+  detectedPackageManager String?
+  detectedInstall        String?
+  detectedBuild          String?
+  detectedStart          String?
+  detectedPort           Int?
+  config                 String?  // raw .verifyhub.yml
+  lastRunAt              DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  runs                   Run[]
+  schedules              Schedule[]
+}
+
+model Run {
+  id             String    @id @default(cuid())
+  number         Int
+  projectId      String
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status         String    @default("QUEUED")
+  trigger        String    @default("manual") // manual | webhook | schedule
+  sourceType     String
+  branch         String?
+  commitSha      String?
+  stage          String?
+  progress       Int       @default(0)
+  detected       String?   // JSON DetectionResult
+  runnerId       String?
+  runnerMode     String?   // local | docker
+  previewUrl     String?
+  internalUrl    String?
+  tunnelProvider String?   // ngrok | none
+  tunnelId       String?
+  result         String?   // passed | failed | error
+  checksPassed   Int       @default(0)
+  checksTotal    Int       @default(0)
+  error          String?
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  durationMs     Int?
+  createdAt      DateTime  @default(now())
+  events         RunEvent[]
+  logs           RunLog[]
+  steps          VerificationStep[]
+  evidence       Evidence[]
+  session        VerificationSession?
+  notifications  Notification[]
+}
+
+model RunEvent {
+  id        String   @id @default(cuid())
+  runId     String
+  run       Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  type      String   // run.status | project.detected | install.started | kane.action | ...
+  message   String
+  status    String?  // success | error | info
+  data      String?  // JSON payload
+  createdAt DateTime @default(now())
+}
+
+model RunLog {
+  id      String @id @default(cuid())
+  runId   String
+  run     Run    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  stream  String // system | stdout | stderr | kane
+  line    String
+  seq     Int
+  createdAt DateTime @default(now())
+}
+
+model VerificationSession {
+  id           String   @id @default(cuid())
+  runId        String   @unique
+  run          Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  engine       String   // kane-cli | http-probe | ...
+  engineMode   String?  // cli | probe | simulated
+  status       String   @default("pending") // pending | running | completed | failed
+  targetUrl    String?
+  instructions String?  // JSON string[]
+  result       String?  // passed | failed | error
+  summary      String?
+  durationMs   Int?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  steps        VerificationStep[]
+}
+
+model VerificationStep {
+  id         String   @id @default(cuid())
+  sessionId  String?
+  session    VerificationSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  runId      String
+  run        Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  index      Int
+  name       String
+  status     String   @default("pending") // pending | running | passed | failed | skipped
+  detail     String?
+  durationMs Int?
+  createdAt  DateTime @default(now())
+}
+
+model Evidence {
+  id        String   @id @default(cuid())
+  runId     String
+  run       Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  kind      String   // log | http | file | step | screenshot
+  label     String
+  content   String?  // inline content (transcripts, snippets)
+  path      String?  // workspace path for larger artifacts
+  mimeType  String?
+  size      Int?
+  createdAt DateTime @default(now())
+}
+
+model Schedule {
+  id         String    @id @default(cuid())
+  projectId  String
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name       String
+  cron       String    // 5-field cron or "every Nm/Nh" shorthand
+  branch     String?
+  telegram   Boolean   @default(true)
+  enabled    Boolean   @default(true)
+  lastRunAt  DateTime?
+  nextRunAt  DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+model Integration {
+  id        String   @id // github | telegram | ngrok | preferences
+  config    String   @default("{}") // JSON
+  connected Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  runId     String?
+  run       Run?     @relation(fields: [runId], references: [id], onDelete: SetNull)
+  channel   String   @default("telegram")
+  kind      String   // run.started | run.ready | run.completed | run.failed | test
+  title     String
+  body      String
+  status    String   @default("pending") // sent | failed | pending | skipped
+  error     String?
+  createdAt DateTime @default(now())
+}
+
+model WebhookDelivery {
+  id             String   @id @default(cuid())
+  source         String   @default("github")
+  event          String
+  signatureValid Boolean
+  handled        Boolean  @default(false)
+  payload        String?
+  createdAt      DateTime @default(now())
+}

@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="KANE — A modular digital footprint and intelligence framework for cybersecurity professionals.">
+  <title>KANE — Modular Intelligence Framework</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            kane: {
+              bg: '#080808',
+              surface: '#0D0D0D',
+              border: '#1E1E1E',
+              text: '#F5F5F5',
+              muted: '#8A8A8A',
+              accent: '#F97316',
+              hover: '#111111'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', system-ui, sans-serif; background-color: #080808; color: #F5F5F5; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #080808; }
+    ::-webkit-scrollbar-thumb { background: #1E1E1E; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #2a2a2a; }
+    .reveal { opacity: 0; transform: translateY(12px); transition: opacity 0.5s ease, transform 0.5s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1; transform: none; transition: none; }
+      * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
+    .terminal-line { font-family: 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', monospace; }
+    .nav-link { position: relative; }
+    .nav-link::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 0; height: 1px; background: #F97316; transition: width 0.2s ease; }
+    .nav-link:hover::after, .nav-link.active::after { width: 100%; }
+    .copy-btn { transition: all 0.15s ease; }
+    .copy-btn:active { transform: scale(0.96); }
+  </style>
+</head>
+<body class="antialiased">
+
+<!-- ==================== NAVIGATION ==================== -->
+<nav id="navbar" class="fixed top-0 left-0 right-0 z-50 border-b border-kane-border bg-kane-bg/80 backdrop-blur-md">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-14">
+      <a href="#" class="flex items-center gap-2 group" aria-label="KANE Home">
+        <span class="text-lg font-bold tracking-tight text-kane-text">KANE</span>
+        <span class="w-1.5 h-1.5 rounded-full bg-kane-accent" aria-hidden="true"></span>
+      </a>
+      <div class="hidden md:flex items-center gap-8">
+        <a href="#product" class="nav-link text-sm text-kane-muted hover:text-kane-text transition-colors">Product</a>
+        <a href="#plugins" class="nav-link text-sm text-kane-muted hover:text-kane-text transition-colors">Plugins</a>
+        <a href="#architecture" class="nav-link text-sm text-kane-muted hover:text-kane-text transition-colors">Architecture</a>
+        <a href="#docs" class="nav-link text-sm text-kane-muted hover:text-kane-text transition-colors">Docs</a>
+        <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="nav-link text-sm text-kane-muted hover:text-kane-text transition-colors">GitHub</a>
+      </div>
+      <div class="hidden md:flex items-center gap-4">
+        <a href="#docs" class="text-sm text-kane-muted hover:text-kane-text transition-colors">Documentation</a>
+        <a href="#install" class="inline-flex items-center gap-1.5 text-sm font-medium text-kane-bg bg-kane-text hover:bg-white px-4 py-2 rounded-md transition-colors">
+          Get Started
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </a>
+      </div>
+      <button id="mobile-menu-btn" class="md:hidden p-2 text-kane-muted hover:text-kane-text transition-colors" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobile-menu">
+        <svg id="hamburger-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="3" y1="6" x2="21" y2="6" class="hamburger-line"/>
+          <line x1="3" y1="12" x2="21" y2="12" class="hamburger-line"/>
+          <line x1="3" y1="18" x2="21" y2="18" class="hamburger-line"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+  <div id="mobile-menu" class="md:hidden hidden border-t border-kane-border bg-kane-bg">
+    <div class="px-4 py-4 space-y-3">
+      <a href="#product" class="block text-sm text-kane-muted hover:text-kane-text py-2 transition-colors">Product</a>
+      <a href="#plugins" class="block text-sm text-kane-muted hover:text-kane-text py-2 transition-colors">Plugins</a>
+      <a href="#architecture" class="block text-sm text-kane-muted hover:text-kane-text py-2 transition-colors">Architecture</a>
+      <a href="#docs" class="block text-sm text-kane-muted hover:text-kane-text py-2 transition-colors">Docs</a>
+      <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="block text-sm text-kane-muted hover:text-kane-text py-2 transition-colors">GitHub</a>
+      <div class="pt-3 border-t border-kane-border flex flex-col gap-3">
+        <a href="#docs" class="text-sm text-kane-muted hover:text-kane-text transition-colors">Documentation</a>
+        <a href="#install" class="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-kane-bg bg-kane-text hover:bg-white px-4 py-2.5 rounded-md transition-colors">
+          Get Started
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- ==================== HERO ==================== -->
+<section id="hero" class="pt-32 pb-16 md:pt-40 md:pb-24 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-4xl mx-auto text-center">
+    <p class="text-xs font-semibold tracking-[0.2em] text-kane-accent uppercase mb-6 reveal">Open-Source Intelligence Framework</p>
+    <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1] mb-6 reveal">
+      Map the digital footprint.<br>
+      <span class="text-kane-muted">Understand the </span><span class="text-kane-accent">connections</span><span class="text-kane-muted">.</span>
+    </h1>
+    <p class="text-base md:text-lg text-kane-muted max-w-2xl mx-auto leading-relaxed mb-10 reveal">
+      Kane is a modular digital footprint and intelligence framework for discovering, correlating and investigating information from legitimate public sources.
+    </p>
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-3 mb-10 reveal">
+      <a href="#install" class="inline-flex items-center gap-2 text-sm font-medium text-kane-bg bg-kane-text hover:bg-white px-6 py-3 rounded-md transition-colors w-full sm:w-auto justify-center">
+        Get Started
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      </a>
+      <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 text-sm font-medium text-kane-text border border-kane-border hover:border-kane-muted px-6 py-3 rounded-md transition-colors w-full sm:w-auto justify-center">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        View on GitHub
+      </a>
+    </div>
+    <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-kane-muted reveal">
+      <span class="inline-flex items-center gap-1.5"><span class="w-1 h-1 rounded-full bg-kane-accent" aria-hidden="true"></span>Python</span>
+      <span class="inline-flex items-center gap-1.5"><span class="w-1 h-1 rounded-full bg-kane-accent" aria-hidden="true"></span>MIT License</span>
+      <span class="inline-flex items-center gap-1.5"><span class="w-1 h-1 rounded-full bg-kane-accent" aria-hidden="true"></span>Plugin Architecture</span>
+      <span class="inline-flex items-center gap-1.5"><span class="w-1 h-1 rounded-full bg-kane-accent" aria-hidden="true"></span>CLI + TUI</span>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== HERO TERMINAL ==================== -->
+<section class="pb-20 md:pb-32 px-4 sm:px-6 lg:px-8" aria-label="Terminal demonstration">
+  <div class="max-w-3xl mx-auto reveal">
+    <div class="rounded-lg border border-kane-border bg-kane-surface overflow-hidden shadow-2xl shadow-black/50">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-kane-border bg-kane-bg">
+        <div class="flex items-center gap-2">
+          <span class="w-3 h-3 rounded-full bg-[#ff5f56]" aria-hidden="true"></span>
+          <span class="w-3 h-3 rounded-full bg-[#ffbd2e]" aria-hidden="true"></span>
+          <span class="w-3 h-3 rounded-full bg-[#27c93f]" aria-hidden="true"></span>
+        </div>
+        <span class="terminal-line text-xs text-kane-muted">kane map example.com</span>
+        <div class="w-14"></div>
+      </div>
+      <div class="p-5 md:p-6 terminal-line text-sm">
+        <div class="mb-5">
+          <p class="text-kane-muted text-xs uppercase tracking-wider mb-1">Target</p>
+          <p class="text-kane-text font-semibold">example.com</p>
+        </div>
+        <div class="space-y-2.5 mb-6">
+          <div class="flex items-center justify-between group cursor-default">
+            <span class="flex items-center gap-2 text-kane-text"><span class="text-kane-accent">&#10003;</span> DNS</span>
+            <span class="text-kane-muted">18 findings</span>
+          </div>
+          <div class="flex items-center justify-between group cursor-default">
+            <span class="flex items-center gap-2 text-kane-text"><span class="text-kane-accent">&#10003;</span> RDAP</span>
+            <span class="text-kane-muted">4 findings</span>
+          </div>
+          <div class="flex items-center justify-between group cursor-default">
+            <span class="flex items-center gap-2 text-kane-text"><span class="text-kane-accent">&#10003;</span> Certificates</span>
+            <span class="text-kane-muted">12 findings</span>
+          </div>
+          <div class="flex items-center justify-between group cursor-default">
+            <span class="flex items-center gap-2 text-kane-text"><span class="text-kane-accent">&#10003;</span> Technology</span>
+            <span class="text-kane-muted">7 findings</span>
+          </div>
+          <div id="terminal-scan-line" class="flex items-center justify-between group cursor-default">
+            <span class="flex items-center gap-2 text-kane-text"><span class="text-kane-accent">&#9680;</span> GitHub</span>
+            <span id="scan-status" class="text-kane-muted">scanning...</span>
+          </div>
+        </div>
+        <div class="flex gap-8 pt-4 border-t border-kane-border">
+          <div>
+            <p class="text-kane-muted text-xs uppercase tracking-wider mb-1">Findings</p>
+            <p id="findings-count" class="text-kane-text font-semibold text-lg">41</p>
+          </div>
+          <div>
+            <p class="text-kane-muted text-xs uppercase tracking-wider mb-1">Relationships</p>
+            <p class="text-kane-text font-semibold text-lg">16</p>
+          </div>
+        </div>
+      </div>
+      <div class="px-5 py-3 border-t border-kane-border bg-kane-bg flex items-center justify-between">
+        <span class="text-xs text-kane-muted">Interactive preview</span>
+        <button id="run-scan-btn" class="text-xs font-medium text-kane-accent hover:text-orange-400 transition-colors flex items-center gap-1.5">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Run Scan
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== PROBLEM SECTION ==================== -->
+<section id="product" class="py-20 md:py-32 px-4 sm:px-6 lg:px-8 border-t border-kane-border">
+  <div class="max-w-6xl mx-auto">
+    <div class="max-w-3xl mb-16 md:mb-20">
+      <h2 class="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-tight mb-6 reveal">
+        Most intelligence tools give you data.<br>
+        <span class="text-kane-accent">Kane gives you context.</span>
+      </h2>
+      <p class="text-kane-muted text-base md:text-lg leading-relaxed reveal">
+        Traditional tools often produce disconnected results. Kane connects the dots between domains, infrastructure, and identities so you can reason about what matters.
+      </p>
+    </div>
+    <div class="grid md:grid-cols-3 gap-6 md:gap-8">
+      <div class="p-6 md:p-8 rounded-lg border border-kane-border bg-kane-surface hover:border-kane-muted transition-colors reveal">
+        <div class="w-10 h-10 rounded-md border border-kane-border flex items-center justify-center mb-5">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-kane-accent" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </div>
+        <h3 class="text-lg font-semibold mb-2">Collect</h3>
+        <p class="text-kane-muted text-sm leading-relaxed">Gather information from public and authorized sources.</p>
+      </div>
+      <div class="p-6 md:p-8 rounded-lg border border-kane-border bg-kane-surface hover:border-kane-muted transition-colors reveal">
+        <div class="w-10 h-10 rounded-md border border-kane-border flex items-center justify-center mb-5">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-kane-accent" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        </div>
+        <h3 class="text-lg font-semibold mb-2">Correlate</h3>
+        <p class="text-kane-muted text-sm leading-relaxed">Connect domains, IPs, certificates, technologies and other entities.</p>
+      </div>
+      <div class="p-6 md:p-8 rounded-lg border border-kane-border bg-kane-surface hover:border-kane-muted transition-colors reveal">
+        <div class="w-10 h-10 rounded-md border border-kane-border flex items-center justify-center mb-5">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-kane-accent" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        </div>
+        <h3 class="text-lg font-semibold mb-2">Understand</h3>
+        <p class="text-kane-muted text-sm leading-relaxed">Turn findings into an investigation that humans can actually reason about.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== CORE PRODUCT ==================== -->
+<section id="plugins" class="py-20 md:py-32 px-4 sm:px-6 lg:px-8 border-t border-kane-border">
+  <div class="max-w-6xl mx-auto">
+    <div class="max-w-3xl mb-16 md:mb-20">
+      <h2 class="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-tight reveal">
+        One framework.<br>
+        <span class="text-kane-muted">Many intelligence sources.</span>
+      </h2>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      <div class="p-5 md:p-6 rounded-lg border border-kane-border bg-kane-surface hover:border-kane-muted transition-colors reveal">
+        <div class="w-8 h-8 rounded border border-kane-border flex items-center justify-center mb-4">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-kane-accent" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </div>
+        <h3 class="text-base font-semibold mb-1.5">DNS</h3>
+        <p class="text-kane-muted text-sm leading-relaxed mb-3">Discover DNS records and infrastructure relationships.</p>
+        <p class="text-xs text-kane-muted/60 font-mono">A &middot; AAAA &middot; MX &middot; NS &middot; TXT</p>
+      </div>
+      <div class="p-5 md:p-6 rounded-lg border border-kane-border bg-kane-surface hover:border-kane-muted transition-colors reveal">
+        <div class="w-8 h-8 rounded border border-kane-border flex items-center justify-center mb-4">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-kane-accent" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        </div>
+        <h3 class="text-base font-semibold mb-1.5">RDAP</h3>
+        <p class="text-kane-muted text-sm leading-relaxed mb-3">Query registration data access protocol for ownership details.</p>
+        <p class="text-xs text-kane-muted/60 font-mono">Registrar &middot; Dates &middot; Entities</p>
+      </div>
+      <div class="p-5 md:p-6 rounded-lg border border-kane-border bg-kane-surface hover:border-kane-muted transition-colors reveal">
+        <div class="w-8 h-8 rounded border border-kane-border flex items-center justify-center mb-4">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-kane-accent" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <h3 class="text-base font-semibold mb-1.5">Certificates</h3>
+        <p class="text-kane-muted text-sm leading-relaxed mb-3">Monitor SSL/TLS certificates and transparency logs.</p>
+        <p class="text-xs text-kane-muted/60 font-mono">CT Logs &middot; SANs &middot; Issuer</p>
+      </div>
+      <div class="p-5 md:p-6 rounded-lg border border-kane-border bg-kane-surface hover:border-kane-muted transition-colors reveal">
+        <div class="w-8 h-8 rounded border border-kane-border flex items-center justify-center mb-4">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-kane-accent" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </div>
+        <h3 class="text-base font-semibold mb-1.5">Technology</h3>
+        <p class="text-kane-muted text-sm leading-relaxed mb-3">Fingerprint web technologies, frameworks and services.</p>
+        <p class="text-xs text-kane-muted/60 font-mono">Stack &middot; Headers &middot; Wappalyzer</p>
+      </div>
+      <div class="p-5 md:p-6 rounded-lg border border-kane-border bg-kane-surface hover:border-kane-muted transition-colors reveal">
+        <div class="w-8 h-8 rounded border border-kane-border flex items-center justify-center mb-4">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" class="text-kane-accent" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        </div>
+        <h3 class="text-base font-semibold mb-1.5">GitHub</h3>
+        <p class="text-kane-muted text-sm leading-relaxed mb-3">Discover repositories, contributors and leaked metadata.</p>
+        <p class="text-xs text-kane-muted/60 font-mono">Repos &middot; Users &middot; Commits</p>
+      </div>
+      <div class="p-5 md:p-6 rounded-lg border border-kane-border bg-kane-surface hover:border-kane-muted transition-colors reveal">
+        <div class="w-8 h-8 rounded border border-kane-border flex items-center justify-center mb-4">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-kane-accent" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <h3 class="text-base font-semibold mb-1.5">Usernames</h3>
+        <p class="text-kane-muted text-sm leading-relaxed mb-3">Trace username presence across platforms and services.</p>
+        <p class="text-xs text-kane-muted/60 font-mono">Social &middot; Forums &middot; Code</p>
+      </div>
+      <div class="p-5 md:p-6 rounded-lg border border-kane-border bg-kane-surface hover:border-kane-muted transition-colors reveal">
+        <div class="w-8 h-8 rounded border border-kane-border flex items-center justify-center mb-4">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-kane-accent" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </div>
+        <h3 class="text-base font-semibold mb-1.5">Metadata</h3>
+        <p class="text-kane-muted text-sm leading-relaxed mb-3">Extract hidden metadata from documents and media files.</p>
+        <p class="text-xs text-kane-muted/60 font-mono">EXIF &middot; PDF &middot; Office</p>
+      </div>
+      <div class="p-5 md:p-6 rounded-lg border border-kane-border bg-kane-surface hover:border-kane-muted transition-colors reveal">
+        <div class="w-8 h-8 rounded border border-kane-border flex items-center justify-center mb-4">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-kane-accent" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <h3 class="text-base font-semibold mb-1.5">Breach Exposure</h3>
+        <p class="text-kane-muted text-sm leading-relaxed mb-3">Check for known data breaches and credential exposure.</p>
+        <p class="text-xs text-kane-muted/60 font-mono">Have I Been Pwned &middot; Dehashed</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== PLUGIN ARCHITECTURE ==================== -->
+<section id="architecture" class="py-20 md:py-32 px-4 sm:px-6 lg:px-8 border-t border-kane-border">
+  <div class="max-w-6xl mx-auto">
+    <div class="max-w-3xl mb-16 md:mb-20">
+      <h2 class="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-tight mb-6 reveal">
+        Built to grow with you.
+      </h2>
+      <p class="text-kane-muted text-base md:text-lg leading-relaxed reveal">
+        Kane's core stays small. Intelligence capabilities live in plugins. Add only what you need, remove what you don't.
+      </p>
+    </div>
+    <div class="flex flex-col items-center reveal">
+      <div class="px-8 py-4 rounded-lg border border-kane-border bg-kane-surface text-center min-w-[200px]">
+        <p class="text-xs text-kane-muted uppercase tracking-wider mb-1">Core</p>
+        <p class="text-lg font-bold">KANE CORE</p>
+      </div>
+      <div class="w-px h-8 bg-kane-border"></div>
+      <div class="px-8 py-4 rounded-lg border border-kane-accent/30 bg-kane-surface text-center min-w-[200px]">
+        <p class="text-xs text-kane-accent uppercase tracking-wider mb-1">Registry</p>
+        <p class="text-lg font-bold">PLUGIN REGISTRY</p>
+      </div>
+      <div class="w-px h-8 bg-kane-border"></div>
+      <div class="grid grid-cols-3 gap-4 md:gap-6 w-full max-w-2xl">
+        <div class="flex flex-col items-center">
+          <div class="w-full px-4 py-3 rounded-lg border border-kane-border bg-kane-surface text-center">
+            <p class="text-sm font-semibold">DNS</p>
+          </div>
+          <div class="w-px h-6 bg-kane-border"></div>
+        </div>
+        <div class="flex flex-col items-center">
+          <div class="w-full px-4 py-3 rounded-lg border border-kane-border bg-kane-surface text-center">
+            <p class="text-sm font-semibold">CERTIFICATES</p>
+          </div>
+          <div class="w-px h-6 bg-kane-border"></div>
+        </div>
+        <div class="flex flex-col items-center">
+          <div class="w-full px-4 py-3 rounded-lg border border-kane-border bg-kane-surface text-center">
+            <p class="text-sm font-semibold">GITHUB</p>
+          </div>
+          <div class="w-px h-6 bg-kane-border"></div>
+        </div>
+      </div>
+      <div class="w-full max-w-xl h-px bg-kane-border relative">
+        <div class="absolute left-1/2 -translate-x-1/2 w-px h-6 bg-kane-border"></div>
+      </div>
+      <div class="mt-6 px-8 py-4 rounded-lg border border-kane-border bg-kane-surface text-center min-w-[240px]">
+        <p class="text-xs text-kane-muted uppercase tracking-wider mb-1">Processing</p>
+        <p class="text-lg font-bold">CORRELATION ENGINE</p>
+      </div>
+      <div class="w-px h-8 bg-kane-border"></div>
+      <div class="px-8 py-4 rounded-lg border border-kane-accent/30 bg-kane-surface text-center min-w-[240px]">
+        <p class="text-xs text-kane-accent uppercase tracking-wider mb-1">Output</p>
+        <p class="text-lg font-bold">INVESTIGATION GRAPH</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== INSTALLATION ==================== -->
+<section id="install" class="py-20 md:py-32 px-4 sm:px-6 lg:px-8 border-t border-kane-border">
+  <div class="max-w-4xl mx-auto">
+    <div class="max-w-3xl mb-12 md:mb-16">
+      <h2 class="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-tight mb-6 reveal">
+        Install a capability.<br>
+        <span class="text-kane-muted">Start investigating.</span>
+      </h2>
+    </div>
+    <div class="rounded-lg border border-kane-border bg-kane-surface overflow-hidden reveal">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-kane-border bg-kane-bg">
+        <span class="text-xs text-kane-muted uppercase tracking-wider">Terminal</span>
+        <button id="copy-install-btn" class="copy-btn inline-flex items-center gap-1.5 text-xs text-kane-muted hover:text-kane-text transition-colors" aria-label="Copy installation commands">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <span id="copy-install-text">Copy</span>
+        </button>
+      </div>
+      <div class="p-5 md:p-6 overflow-x-auto">
+        <pre class="terminal-line text-sm text-kane-text leading-relaxed" id="install-code"><span class="text-kane-muted">$</span> pipx install kane-intelligence
+
+<span class="text-kane-muted">$</span> kane
+
+<span class="text-kane-muted">$</span> kane plugin install dns
+<span class="text-kane-muted">$</span> kane plugin install github
+<span class="text-kane-muted">$</span> kane plugin install certificates
+
+<span class="text-kane-muted">$</span> kane map example.com</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== INVESTIGATION GRAPH ==================== -->
+<section class="py-20 md:py-32 px-4 sm:px-6 lg:px-8 border-t border-kane-border">
+  <div class="max-w-5xl mx-auto">
+    <div class="max-w-3xl mb-16 md:mb-20">
+      <h2 class="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-tight reveal">
+        From findings to <span class="text-kane-accent">relationships</span>.
+      </h2>
+    </div>
+    <div class="reveal">
+      <div class="rounded-lg border border-kane-border bg-kane-surface p-6 md:p-10 overflow-x-auto">
+        <svg viewBox="0 0 600 280" class="w-full min-w-[500px]" aria-label="Investigation graph showing relationships between entities">
+          <line x1="120" y1="140" x2="260" y2="60" stroke="#1E1E1E" stroke-width="1.5"/>
+          <line x1="120" y1="140" x2="260" y2="140" stroke="#1E1E1E" stroke-width="1.5"/>
+          <line x1="120" y1="140" x2="260" y2="220" stroke="#1E1E1E" stroke-width="1.5"/>
+          <line x1="120" y1="140" x2="480" y2="140" stroke="#1E1E1E" stroke-width="1.5" stroke-dasharray="4 4"/>
+          <polygon points="255,58 260,60 255,62" fill="#1E1E1E"/>
+          <polygon points="255,138 260,140 255,142" fill="#1E1E1E"/>
+          <polygon points="255,218 260,220 255,222" fill="#1E1E1E"/>
+          <rect x="20" y="115" width="100" height="50" rx="6" fill="#0D0D0D" stroke="#F97316" stroke-width="1.5"/>
+          <text x="70" y="135" text-anchor="middle" fill="#F5F5F5" font-size="13" font-weight="600" font-family="Inter, sans-serif">example.com</text>
+          <text x="70" y="152" text-anchor="middle" fill="#8A8A8A" font-size="10" font-family="Inter, sans-serif">Target</text>
+          <rect x="260" y="35" width="140" height="50" rx="6" fill="#0D0D0D" stroke="#1E1E1E" stroke-width="1"/>
+          <text x="330" y="55" text-anchor="middle" fill="#F5F5F5" font-size="13" font-weight="600" font-family="Inter, sans-serif">203.0.113.10</text>
+          <text x="330" y="72" text-anchor="middle" fill="#8A8A8A" font-size="10" font-family="Inter, sans-serif">IPv4 Address</text>
+          <rect x="260" y="115" width="160" height="50" rx="6" fill="#0D0D0D" stroke="#1E1E1E" stroke-width="1"/>
+          <text x="340" y="135" text-anchor="middle" fill="#F5F5F5" font-size="13" font-weight="600" font-family="Inter, sans-serif">api.example.com</text>
+          <text x="340" y="152" text-anchor="middle" fill="#8A8A8A" font-size="10" font-family="Inter, sans-serif">Subdomain</text>
+          <rect x="260" y="195" width="140" height="50" rx="6" fill="#0D0D0D" stroke="#1E1E1E" stroke-width="1"/>
+          <text x="330" y="215" text-anchor="middle" fill="#F5F5F5" font-size="13" font-weight="600" font-family="Inter, sans-serif">Certificate</text>
+          <text x="330" y="232" text-anchor="middle" fill="#8A8A8A" font-size="10" font-family="Inter, sans-serif">SSL/TLS</text>
+          <rect x="480" y="115" width="120" height="50" rx="6" fill="#0D0D0D" stroke="#1E1E1E" stroke-width="1"/>
+          <text x="540" y="135" text-anchor="middle" fill="#F5F5F5" font-size="13" font-weight="600" font-family="Inter, sans-serif">Technology</text>
+          <text x="540" y="152" text-anchor="middle" fill="#8A8A8A" font-size="10" font-family="Inter, sans-serif">Fingerprint</text>
+        </svg>
+      </div>
+      <p class="text-center text-xs text-kane-muted mt-4">Investigation graph showing correlated entities from a single target.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== TUI SECTION ==================== -->
+<section class="py-20 md:py-32 px-4 sm:px-6 lg:px-8 border-t border-kane-border">
+  <div class="max-w-6xl mx-auto">
+    <div class="max-w-3xl mb-16 md:mb-20">
+      <h2 class="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-tight mb-6 reveal">
+        Your intelligence stack.<br>
+        <span class="text-kane-muted">In the terminal.</span>
+      </h2>
+      <p class="text-kane-muted text-base md:text-lg leading-relaxed reveal">
+        Designed for keyboard-first workflows. Navigate investigations without leaving your terminal.
+      </p>
+    </div>
+    <div class="reveal">
+      <div class="rounded-lg border border-kane-border bg-kane-surface overflow-hidden shadow-2xl shadow-black/50">
+        <div class="flex items-center justify-between px-4 py-2 border-b border-kane-border bg-kane-bg">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-[#ff5f56]" aria-hidden="true"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]" aria-hidden="true"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-[#27c93f]" aria-hidden="true"></span>
+          </div>
+          <span class="terminal-line text-[10px] text-kane-muted">kane tui</span>
+          <div class="w-10"></div>
+        </div>
+        <div class="flex flex-col md:flex-row">
+          <div class="w-full md:w-48 border-b md:border-b-0 md:border-r border-kane-border bg-kane-bg p-3">
+            <nav class="space-y-0.5" aria-label="TUI Navigation">
+              <a href="#" class="flex items-center gap-2 px-3 py-2 rounded text-xs font-medium text-kane-bg bg-kane-text" aria-current="page">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                Dashboard
+              </a>
+              <a href="#" class="flex items-center gap-2 px-3 py-2 rounded text-xs text-kane-muted hover:text-kane-text transition-colors">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                Targets
+              </a>
+              <a href="#" class="flex items-center gap-2 px-3 py-2 rounded text-xs text-kane-muted hover:text-kane-text transition-colors">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                Findings
+              </a>
+              <a href="#" class="flex items-center gap-2 px-3 py-2 rounded text-xs text-kane-muted hover:text-kane-text transition-colors">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                Graph
+              </a>
+              <a href="#" class="flex items-center gap-2 px-3 py-2 rounded text-xs text-kane-muted hover:text-kane-text transition-colors">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                Plugins
+              </a>
+              <a href="#" class="flex items-center gap-2 px-3 py-2 rounded text-xs text-kane-muted hover:text-kane-text transition-colors">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                Reports
+              </a>
+              <a href="#" class="flex items-center gap-2 px-3 py-2 rounded text-xs text-kane-muted hover:text-kane-text transition-colors">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Settings
+              </a>
+            </nav>
+          </div>
+          <div class="flex-1 p-4 md:p-6">
+            <div class="mb-6">
+              <h3 class="text-sm font-semibold mb-4">Dashboard Overview</h3>
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div class="p-3 rounded border border-kane-border bg-kane-bg">
+                  <p class="text-[10px] text-kane-muted uppercase tracking-wider mb-1">Investigations</p>
+                  <p class="text-xl font-bold">12</p>
+                </div>
+                <div class="p-3 rounded border border-kane-border bg-kane-bg">
+                  <p class="text-[10px] text-kane-muted uppercase tracking-wider mb-1">Targets</p>
+                  <p class="text-xl font-bold">48</p>
+                </div>
+                <div class="p-3 rounded border border-kane-border bg-kane-bg">
+                  <p class="text-[10px] text-kane-muted uppercase tracking-wider mb-1">Findings</p>
+                  <p class="text-xl font-bold text-kane-accent">1,247</p>
+                </div>
+                <div class="p-3 rounded border border-kane-border bg-kane-bg">
+                  <p class="text-[10px] text-kane-muted uppercase tracking-wider mb-1">Relationships</p>
+                  <p class="text-xl font-bold">384</p>
+                </div>
+                <div class="p-3 rounded border border-kane-border bg-kane-bg">
+                  <p class="text-[10px] text-kane-muted uppercase tracking-wider mb-1">Plugins</p>
+                  <p class="text-xl font-bold">8</p>
+                </div>
+                <div class="p-3 rounded border border-kane-border bg-kane-bg">
+                  <p class="text-[10px] text-kane-muted uppercase tracking-wider mb-1">Active Scans</p>
+                  <p class="text-xl font-bold text-kane-accent">3</p>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold mb-3">Recent Activity</h3>
+              <div class="space-y-2">
+                <div class="flex items-center justify-between py-2 border-b border-kane-border/50">
+                  <div class="flex items-center gap-3">
+                    <span class="w-1.5 h-1.5 rounded-full bg-kane-accent"></span>
+                    <span class="text-xs">example.com</span>
+                  </div>
+                  <span class="text-[10px] text-kane-muted">2 min ago</span>
+                </div>
+                <div class="flex items-center justify-between py-2 border-b border-kane-border/50">
+                  <div class="flex items-center gap-3">
+                    <span class="w-1.5 h-1.5 rounded-full bg-kane-muted"></span>
+                    <span class="text-xs">api.example.com</span>
+                  </div>
+                  <span class="text-[10px] text-kane-muted">15 min ago</span>
+                </div>
+                <div class="flex items-center justify-between py-2 border-b border-kane-border/50">
+                  <div class="flex items-center gap-3">
+                    <span class="w-1.5 h-1.5 rounded-full bg-kane-muted"></span>
+                    <span class="text-xs">corp-target.io</span>
+                  </div>
+                  <span class="text-[10px] text-kane-muted">1 hr ago</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="text-center text-xs text-kane-muted mt-4">Designed for keyboard-first workflows.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== DEVELOPER SECTION ==================== -->
+<section class="py-20 md:py-32 px-4 sm:px-6 lg:px-8 border-t border-kane-border">
+  <div class="max-w-6xl mx-auto">
+    <div class="max-w-3xl mb-16 md:mb-20">
+      <h2 class="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-tight reveal">
+        Made for developers.<br>
+        <span class="text-kane-muted">Built for investigators.</span>
+      </h2>
+    </div>
+    <div class="grid md:grid-cols-3 gap-6 md:gap-8">
+      <div class="p-6 md:p-8 rounded-lg border border-kane-border bg-kane-surface hover:border-kane-muted transition-colors reveal">
+        <div class="w-10 h-10 rounded-md border border-kane-border flex items-center justify-center mb-5">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-kane-accent" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </div>
+        <h3 class="text-lg font-semibold mb-4">Python-first</h3>
+        <ul class="space-y-2 text-sm text-kane-muted">
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-kane-accent"></span>Async collectors</li>
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-kane-accent"></span>Typed models</li>
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-kane-accent"></span>Clean architecture</li>
+        </ul>
+      </div>
+      <div class="p-6 md:p-8 rounded-lg border border-kane-border bg-kane-surface hover:border-kane-muted transition-colors reveal">
+        <div class="w-10 h-10 rounded-md border border-kane-border flex items-center justify-center mb-5">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-kane-accent" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        </div>
+        <h3 class="text-lg font-semibold mb-4">Plugin-first</h3>
+        <ul class="space-y-2 text-sm text-kane-muted">
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-kane-accent"></span>Independent collectors</li>
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-kane-accent"></span>Discoverable plugins</li>
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-kane-accent"></span>Extensible capabilities</li>
+        </ul>
+      </div>
+      <div class="p-6 md:p-8 rounded-lg border border-kane-border bg-kane-surface hover:border-kane-muted transition-colors reveal">
+        <div class="w-10 h-10 rounded-md border border-kane-border flex items-center justify-center mb-5">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-kane-accent" aria-hidden="true"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></svg>
+        </div>
+        <h3 class="text-lg font-semibold mb-4">Automation-ready</h3>
+        <ul class="space-y-2 text-sm text-kane-muted">
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-kane-accent"></span>CLI &middot; JSON &middot; CSV</li>
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-kane-accent"></span>Markdown &middot; HTML</li>
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-kane-accent"></span>API-ready</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SECURITY / TRUST ==================== -->
+<section class="py-20 md:py-32 px-4 sm:px-6 lg:px-8 border-t border-kane-border">
+  <div class="max-w-6xl mx-auto">
+    <div class="max-w-3xl mb-16 md:mb-20">
+      <h2 class="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-tight mb-6 reveal">
+        Public information.<br>
+        <span class="text-kane-accent">Responsible intelligence.</span>
+      </h2>
+      <p class="text-kane-muted text-base md:text-lg leading-relaxed reveal">
+        Kane is designed around ethical principles. We believe intelligence work should be transparent, accountable, and respectful of boundaries.
+      </p>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+      <div class="flex items-start gap-4 p-5 rounded-lg border border-kane-border bg-kane-surface reveal">
+        <div class="w-8 h-8 rounded border border-kane-border flex items-center justify-center shrink-0 mt-0.5">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-kane-accent" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold mb-1">Public sources</h3>
+          <p class="text-kane-muted text-sm leading-relaxed">Only gathers from legitimate public and authorized data sources.</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-4 p-5 rounded-lg border border-kane-border bg-kane-surface reveal">
+        <div class="w-8 h-8 rounded border border-kane-border flex items-center justify-center shrink-0 mt-0.5">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-kane-accent" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold mb-1">Authorized targets</h3>
+          <p class="text-kane-muted text-sm leading-relaxed">Built for targets you own or have explicit permission to investigate.</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-4 p-5 rounded-lg border border-kane-border bg-kane-surface reveal">
+        <div class="w-8 h-8 rounded border border-kane-border flex items-center justify-center shrink-0 mt-0.5">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-kane-accent" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold mb-1">Evidence-backed findings</h3>
+          <p class="text-kane-muted text-sm leading-relaxed">Every finding includes source attribution and confidence scoring.</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-4 p-5 rounded-lg border border-kane-border bg-kane-surface reveal">
+        <div class="w-8 h-8 rounded border border-kane-border flex items-center justify-center shrink-0 mt-0.5">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-kane-accent" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold mb-1">Rate limiting</h3>
+          <p class="text-kane-muted text-sm leading-relaxed">Respects source rate limits to prevent abuse and service disruption.</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-4 p-5 rounded-lg border border-kane-border bg-kane-surface reveal">
+        <div class="w-8 h-8 rounded border border-kane-border flex items-center justify-center shrink-0 mt-0.5">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-kane-accent" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold mb-1">Explicit permissions</h3>
+          <p class="text-kane-muted text-sm leading-relaxed">Requires clear scope definition before any collection begins.</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-4 p-5 rounded-lg border border-kane-border bg-kane-surface reveal">
+        <div class="w-8 h-8 rounded border border-kane-border flex items-center justify-center shrink-0 mt-0.5">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-kane-accent" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold mb-1">Transparent confidence</h3>
+          <p class="text-kane-muted text-sm leading-relaxed">All correlations include confidence levels so you can judge reliability.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== FINAL CTA ==================== -->
+<section class="py-24 md:py-40 px-4 sm:px-6 lg:px-8 border-t border-kane-border">
+  <div class="max-w-3xl mx-auto text-center">
+    <h2 class="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-tight mb-6 reveal">
+      Build your intelligence workflow.
+    </h2>
+    <p class="text-kane-muted text-base md:text-lg mb-10 reveal">
+      Start with Kane. Extend it with plugins.
+    </p>
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-3 reveal">
+      <a href="#install" class="inline-flex items-center gap-2 text-sm font-medium text-kane-bg bg-kane-text hover:bg-white px-6 py-3 rounded-md transition-colors w-full sm:w-auto justify-center">
+        Get Started
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      </a>
+      <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 text-sm font-medium text-kane-text border border-kane-border hover:border-kane-muted px-6 py-3 rounded-md transition-colors w-full sm:w-auto justify-center">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        View GitHub
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== FOOTER ==================== -->
+<footer class="border-t border-kane-border bg-kane-bg">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
+      <div class="col-span-2 md:col-span-1">
+        <a href="#" class="flex items-center gap-2 mb-4" aria-label="KANE Home">
+          <span class="text-lg font-bold tracking-tight">KANE</span>
+          <span class="w-1.5 h-1.5 rounded-full bg-kane-accent" aria-hidden="true"></span>
+        </a>
+        <p class="text-sm text-kane-muted leading-relaxed">Modular digital footprint &amp; intelligence framework.</p>
+      </div>
+      <div>
+        <h4 class="text-xs font-semibold uppercase tracking-wider text-kane-muted mb-4">Product</h4>
+        <ul class="space-y-2.5">
+          <li><a href="#product" class="text-sm text-kane-text hover:text-kane-accent transition-colors">Product</a></li>
+          <li><a href="#plugins" class="text-sm text-kane-text hover:text-kane-accent transition-colors">Plugins</a></li>
+          <li><a href="#architecture" class="text-sm text-kane-text hover:text-kane-accent transition-colors">Architecture</a></li>
+          <li><a href="#docs" class="text-sm text-kane-text hover:text-kane-accent transition-colors">Documentation</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="text-xs font-semibold uppercase tracking-wider text-kane-muted mb-4">Community</h4>
+        <ul class="space-y-2.5">
+          <li><a href="https://github.com" target="_blank" rel="noopener noreferrer" class="text-sm text-kane-text hover:text-kane-accent transition-colors">GitHub</a></li>
+          <li><a href="https://github.com" target="_blank" rel="noopener noreferrer" class="text-sm text-kane-text hover:text-kane-accent transition-colors">Issues</a></li>
+          <li><a href="https://github.com" target="_blank" rel="noopener noreferrer" class="text-sm text-kane-text hover:text-kane-accent transition-colors">Discussions</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="text-xs font-semibold uppercase tracking-wider text-kane-muted mb-4">Legal</h4>
+        <ul class="space-y-2.5">
+          <li><a href="#" class="text-sm text-kane-text hover:text-kane-accent transition-colors">License</a></li>
+          <li><a href="#" class="text-sm text-kane-text hover:text-kane-accent transition-colors">Security</a></li>
+          <li><a href="#" class="text-sm text-kane-text hover:text-kane-accent transition-colors">Privacy</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="mt-12 pt-8 border-t border-kane-border flex flex-col sm:flex-row items-center justify-between gap-4">
+      <p class="text-xs text-kane-muted">&copy; 2026 Kane. Built for responsible intelligence.</p>
+      <p class="text-xs text-kane-muted/60">MIT License</p>
+    </div>
+  </div>
+</footer>
+
+<!-- ==================== JAVASCRIPT ==================== -->
+<script>
+(function() {
+  'use strict';
+
+  // Mobile Navigation
+  const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+  const mobileMenu = document.getElementById('mobile-menu');
+  let menuOpen = false;
+
+  if (mobileMenuBtn && mobileMenu) {
+    mobileMenuBtn.addEventListener('click', function() {
+      menuOpen = !menuOpen;
+      mobileMenu.classList.toggle('hidden', !menuOpen);
+      mobileMenuBtn.setAttribute('aria-expanded', menuOpen);
+    });
+
+    // Close mobile menu when clicking a link
+    mobileMenu.querySelectorAll('a').forEach(function(link) {
+      link.addEventListener('click', function() {
+        menuOpen = false;
+        mobileMenu.classList.add('hidden');
+        mobileMenuBtn.setAttribute('aria-expanded', 'false');
+      });
+    });
+  }
+
+  // Copy to Clipboard
+  const copyBtn = document.getElementById('copy-install-btn');
+  const copyText = document.getElementById('copy-install-text');
+  const installCode = document.getElementById('install-code');
+
+  if (copyBtn && installCode) {
+    copyBtn.addEventListener('click', function() {
+      const text = installCode.innerText;
+      navigator.clipboard.writeText(text).then(function() {
+        copyText.textContent = 'Copied';
+        setTimeout(function() {
+          copyText.textContent = 'Copy';
+        }, 2000);
+      }).catch(function() {
+        // Fallback
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+          document.execCommand('copy');
+          copyText.textContent = 'Copied';
+          setTimeout(function() {
+            copyText.textContent = 'Copy';
+          }, 2000);
+        } catch (e) {}
+        document.body.removeChild(textarea);
+      });
+    });
+  }
+
+  // Scroll Reveal (IntersectionObserver)
+  const revealElements = document.querySelectorAll('.reveal');
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (!prefersReducedMotion && 'IntersectionObserver' in window) {
+    const revealObserver = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, {
+      threshold: 0.1,
+      rootMargin: '0px 0px -40px 0px'
+    });
+
+    revealElements.forEach(function(el) {
+      revealObserver.observe(el);
+    });
+  } else {
+    // If reduced motion or no IO support, show everything immediately
+    revealElements.forEach(function(el) {
+      el.classList.add('visible');
+    });
+  }
+
+  // Active Navigation on Scroll
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.nav-link');
+
+  function updateActiveNav() {
+    let current = '';
+    const scrollPos = window.scrollY + 100;
+
+    sections.forEach(function(section) {
+      const sectionTop = section.offsetTop;
+      const sectionHeight = section.offsetHeight;
+      if (scrollPos >= sectionTop && scrollPos < sectionTop + sectionHeight) {
+        current = section.getAttribute('id');
+      }
+    });
+
+    navLinks.forEach(function(link) {
+      link.classList.remove('active');
+      if (link.getAttribute('href') === '#' + current) {
+        link.classList.add('active');
+      }
+    });
+  }
+
+  let ticking = false;
+  window.addEventListener('scroll', function() {
+    if (!ticking) {
+      window.requestAnimationFrame(function() {
+        updateActiveNav();
+        ticking = false;
+      });
+      ticking = true;
+    }
+  });
+  updateActiveNav();
+
+  // Terminal Fake Interaction
+  const runScanBtn = document.getElementById('run-scan-btn');
+  const scanStatus = document.getElementById('scan-status');
+  const terminalScanLine = document.getElementById('terminal-scan-line');
+  const findingsCount = document.getElementById('findings-count');
+  let isScanning = false;
+
+  if (runScanBtn && scanStatus) {
+    runScanBtn.addEventListener('click', function() {
+      if (isScanning) return;
+      isScanning = true;
+      runScanBtn.style.opacity = '0.5';
+      runScanBtn.style.pointerEvents = 'none';
+      scanStatus.textContent = 'SCANNING...';
+      scanStatus.classList.add('text-kane-accent');
+
+      setTimeout(function() {
+        scanStatus.textContent = 'SCAN COMPLETE';
+        scanStatus.classList.remove('text-kane-accent');
+        scanStatus.classList.add('text-kane-text');
+        if (terminalScanLine) {
+          const icon = terminalScanLine.querySelector('span:first-child');
+          if (icon) icon.innerHTML = '<span class="text-kane-accent">&#10003;</span>';
+        }
+        if (findingsCount) {
+          findingsCount.textContent = '53';
+        }
+        runScanBtn.style.opacity = '1';
+        runScanBtn.style.pointerEvents = 'auto';
+        isScanning = false;
+      }, 2000);
+    });
+  }
+
+  // Navbar background on scroll
+  const navbar = document.getElementById('navbar');
+  window.addEventListener('scroll', function() {
+    if (window.scrollY > 10) {
+      navbar.classList.add('bg-kane-bg/95');
+      navbar.classList.remove('bg-kane-bg/80');
+    } else {
+      navbar.classList.add('bg-kane-bg/80');
+      navbar.classList.remove('bg-kane-bg/95');
+    }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+{"name":"verifyhub-ws","scripts":{"dev":"bun --hot index.ts"}}
