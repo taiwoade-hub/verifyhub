@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import {
   ChevronDown,
   ChevronRight,
@@ -198,6 +198,7 @@ function ConfigView({ projectId }: { projectId: string }) {
 // ---------------------------------------------------------------------------
 
 function WorkspaceInner() {
+  const router = useRouter()
   const params = useParams<{ id: string }>()
   const id = params.id
   const { data, error, loading, refresh } = useApi<{ project: Project }>(`/api/v1/projects/${id}`, 5000)
@@ -247,9 +248,13 @@ function WorkspaceInner() {
   const startRun = async () => {
     setStarting(true)
     try {
-      const { run } = await apiSend<{ run: Run }>(`/api/v1/projects/${id}/runs`, 'POST', {})
-      toast.success(`Run #${run.number} started`)
-      refresh()
+      const { run } = await apiSend<{ run: Run }>(`/api/v1/projects/${id}/runs`, 'POST', {
+        engine: 'playwright',
+        browser: 'firefox',
+        recordVideo: true,
+      })
+      toast.success(`Run #${run.number} started (Firefox)`)
+      router.push(`/runs/${run.id}`)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'failed to start run')
     } finally {

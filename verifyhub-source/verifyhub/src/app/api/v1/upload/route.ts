@@ -13,48 +13,75 @@ export const maxDuration = 60
 export async function POST(req: NextRequest) {
   try {
     const form = await req.formData()
-    const file = form.get('file')
+    const allFiles = form.getAll('files').concat(form.getAll('file')).filter((f): f is File => f instanceof File)
+    const relativePaths = (form.getAll('paths') as string[]).map((p) => String(p).trim())
     const rawCode = form.get('code') as string | null
 
-    let fileName = 'index.html'
-    let fileBuffer: Buffer
+    let projectName = (form.get('name') as string | null)?.trim() || ''
 
-    if (file instanceof File) {
-      if (file.size > 25 * 1024 * 1024) {
-        return NextResponse.json({ error: 'file too large (max 25 MB)' }, { status: 413 })
-      }
-      fileName = file.name
-      fileBuffer = Buffer.from(await file.arrayBuffer())
-    } else if (rawCode && rawCode.trim()) {
-      fileName = (form.get('fileName') as string | null)?.trim() || 'index.html'
-      fileBuffer = Buffer.from(rawCode, 'utf8')
-    } else {
-      return NextResponse.json({ error: 'provide a file (.zip, .html, or code file) or paste code' }, { status: 400 })
+    if (allFiles.length === 0 && (!rawCode || !rawCode.trim())) {
+      return NextResponse.json({ error: 'provide a file, archive, folder, or code' }, { status: 400 })
     }
 
-    const lowerName = fileName.toLowerCase()
-    const isArchive = lowerName.endsWith('.zip') || lowerName.endsWith('.tar.gz') || lowerName.endsWith('.tgz') || lowerName.endsWith('.tar')
-    const isHtml = lowerName.endsWith('.html') || lowerName.endsWith('.htm')
+    // Check size limit (max 50 MB total)
+    const totalSize = allFiles.reduce((sum, f) => sum + f.size, 0)
+    if (totalSize > 50 * 1024 * 1024) {
+      return NextResponse.json({ error: 'upload exceeds 50 MB limit' }, { status: 413 })
+    }
 
-    const name =
-      (form.get('name') as string | null)?.trim() ||
-      fileName.replace(/\.(zip|tar\.gz|tgz|tar|html|htm|js|py|ts)$/i, '') ||
-      'HTML Project'
+    const isFolder = allFiles.length > 1 || relativePaths.some((p) => p.includes('/'))
+    const singleFile = allFiles.length === 1 ? allFiles[0] : null
+    const singleName = singleFile ? singleFile.name : (form.get('fileName') as string | null)?.trim() || 'index.html'
+    const lowerName = singleName.toLowerCase()
+    const isArchive = !isFolder && singleFile && (lowerName.endsWith('.zip') || lowerName.endsWith('.tar.gz') || lowerName.endsWith('.tgz') || lowerName.endsWith('.tar'))
+    const isHtml = !isFolder && (lowerName.endsWith('.html') || lowerName.endsWith('.htm'))
+
+    if (!projectName) {
+      if (isFolder) {
+        // Derive folder name from first relative path or generic
+        const firstRel = relativePaths[0] || (singleFile?.name || '')
+        const topDir = firstRel.split('/')[0]
+        projectName = topDir && topDir !== '.' ? topDir : 'Uploaded Project'
+      } else if (isArchive) {
+        projectName = singleName.replace(/\.(zip|tar\.gz|tgz|tar)$/i, '')
+      } else {
+        projectName = singleName.replace(/\.(html|htm|js|py|ts)$/i, '') || 'HTML Project'
+      }
+    }
 
     const project = await db.project.create({
       data: {
-        name,
+        name: projectName,
         sourceType: 'upload',
-        description: isArchive ? `uploaded archive ${fileName}` : `uploaded ${fileName}`,
+        description: isFolder
+          ? `uploaded project folder (${allFiles.length} files)`
+          : isArchive
+            ? `uploaded archive ${singleName}`
+            : `uploaded ${singleName}`,
       },
     })
     const dest = store.projectDir(project.id)
     fs.mkdirSync(dest, { recursive: true })
 
-    let fileCount = 1
+    let fileCount = 0
 
-    if (isArchive) {
-      const tmp = path.join(store.DATA_DIR, `upload-${Date.now()}-${fileName}`)
+    if (isFolder) {
+      // Multiple files or folder upload preserving paths
+      for (let i = 0; i < allFiles.length; i++) {
+        const f = allFiles[i]
+        const relPath = relativePaths[i] || f.name
+        // Clean leading slash or ./
+        const cleanRel = relPath.replace(/^(\.\/|\/)+/, '')
+        const targetPath = store.safeJoin(dest, cleanRel)
+        if (!targetPath) continue
+        fs.mkdirSync(path.dirname(targetPath), { recursive: true })
+        const buf = Buffer.from(await f.arrayBuffer())
+        fs.writeFileSync(targetPath, buf)
+        fileCount++
+      }
+    } else if (isArchive && singleFile) {
+      const fileBuffer = Buffer.from(await singleFile.arrayBuffer())
+      const tmp = path.join(store.DATA_DIR, `upload-${Date.now()}-${singleName}`)
       fs.mkdirSync(store.DATA_DIR, { recursive: true })
       fs.writeFileSync(tmp, fileBuffer)
       try {
@@ -74,13 +101,21 @@ export async function POST(req: NextRequest) {
       } finally {
         fs.rmSync(tmp, { force: true })
       }
-    } else {
-      // Single file upload (e.g. index.html, app.js, script.py)
-      const targetPath = path.join(dest, fileName)
+    } else if (singleFile) {
+      // Single code file (e.g. index.html)
+      const fileBuffer = Buffer.from(await singleFile.arrayBuffer())
+      const targetPath = path.join(dest, singleName)
       fs.writeFileSync(targetPath, fileBuffer)
-      // If it's an HTML file not named index.html, also write index.html copy for direct root serving
-      if (isHtml && fileName.toLowerCase() !== 'index.html') {
+      if (isHtml && singleName.toLowerCase() !== 'index.html') {
         fs.writeFileSync(path.join(dest, 'index.html'), fileBuffer)
+      }
+      fileCount = 1
+    } else if (rawCode) {
+      // Raw pasted code
+      const targetPath = path.join(dest, singleName)
+      fs.writeFileSync(targetPath, rawCode, 'utf8')
+      if (isHtml && singleName.toLowerCase() !== 'index.html') {
+        fs.writeFileSync(path.join(dest, 'index.html'), rawCode, 'utf8')
       }
       fileCount = 1
     }

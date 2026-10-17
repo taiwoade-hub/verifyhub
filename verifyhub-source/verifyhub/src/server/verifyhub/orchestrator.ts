@@ -21,7 +21,9 @@ import * as runner from './runner'
 import { resolveEngine } from './engines'
 import { startTunnel, stopTunnel } from './ngrok'
 import { broadcastRun } from './bus'
-import { getTelegram, getPreferences, telegramSend, formatRunMessage, downloadRepoTarball } from './integrations'
+import * as fs from 'fs'
+import * as path from 'path'
+import { getTelegram, getPreferences, telegramSend, telegramSendPhoto, telegramSendVideo, telegramSendDocument, formatRunMessage, downloadRepoTarball } from './integrations'
 import { isActive, stageProgress, type RunStatus, type VerifyHubConfig } from './types'
 
 interface OrchestratorState {
@@ -192,7 +194,16 @@ export function ensureScheduler(): void {
 
 export async function createRun(
   projectId: string,
-  opts: { trigger?: string; branch?: string; commitSha?: string } = {}
+  opts: {
+    trigger?: string
+    branch?: string
+    commitSha?: string
+    engine?: string
+    browser?: string
+    recordVideo?: boolean
+    instructions?: string[]
+    configOverride?: VerifyHubConfig
+  } = {}
 ): Promise<{ id: string; number: number }> {
   const project = await withDbRetry(() => db.project.findUniqueOrThrow({ where: { id: projectId } }))
   const count = await withDbRetry(() => db.run.count({ where: { projectId } }))
@@ -217,7 +228,7 @@ export async function createRun(
     await broadcastRun(run.id, 'run.created', { runId: run.id, number: run.number, projectId })
   } catch {}
   // fire and forget
-  void executeRun(run.id).catch(async (err) => {
+  void executeRun(run.id, opts).catch(async (err) => {
     await addLog(run.id, 'stderr', `orchestrator error: ${err?.message || err}`)
     await setStatus(run.id, 'FAILED', { error: String(err?.message || err), result: 'error' })
     await finalizeRun(run.id, 'error')
@@ -225,7 +236,16 @@ export async function createRun(
   return { id: run.id, number: run.number }
 }
 
-async function executeRun(runId: string): Promise<void> {
+async function executeRun(
+  runId: string,
+  runOpts?: {
+    engine?: string
+    browser?: string
+    recordVideo?: boolean
+    instructions?: string[]
+    configOverride?: VerifyHubConfig
+  }
+): Promise<void> {
   const s = state()
   if (s.running.has(runId)) return
   s.running.add(runId)
@@ -259,13 +279,27 @@ async function executeRun(runId: string): Promise<void> {
       await log('system', `[git] downloading ${project.gitRepo} (${run.branch || project.gitBranch || 'default branch'})`)
       const fs = await import('fs')
       const tar = `/tmp/verifyhub-${runId}.tar.gz`
-      const { commitSha } = await downloadRepoTarball(project.gitRepo, run.branch || project.gitBranch || '', tar)
-      await store.extractTarball(tar, projectWork)
-      fs.rmSync(tar, { force: true })
-      sourceRoot = projectWork
-      if (commitSha) {
-        await withDbRetry(() => db.run.update({ where: { id: runId }, data: { commitSha } }))
+      let cloned = false
+      try {
+        const { commitSha } = await downloadRepoTarball(project.gitRepo, run.branch || project.gitBranch || '', tar)
+        await store.extractTarball(tar, projectWork)
+        fs.rmSync(tar, { force: true })
+        if (commitSha) {
+          await withDbRetry(() => db.run.update({ where: { id: runId }, data: { commitSha } }))
+        }
+        cloned = true
+      } catch (tarErr) {
+        // Fallback to git clone (supports GitLab, Bitbucket, self-hosted git, and direct git URLs)
+        await log('system', `[git] tarball download fallback: cloning via git CLI...`)
+        const { cloneGitRepo } = await import('./integrations')
+        const gitUrl = project.sourceUrl || `https://github.com/${project.gitRepo}.git`
+        const { commitSha } = await cloneGitRepo(gitUrl, run.branch || project.gitBranch || undefined, projectWork)
+        if (commitSha) {
+          await withDbRetry(() => db.run.update({ where: { id: runId }, data: { commitSha } }))
+        }
+        cloned = true
       }
+      sourceRoot = projectWork
       await addEvent(runId, 'runner.created', 'repository downloaded and extracted', { repo: project.gitRepo })
       await log('system', '[git] extraction complete')
     } else if (project.sourceType === 'url') {
@@ -277,6 +311,7 @@ async function executeRun(runId: string): Promise<void> {
     // ---------------- URL-only runs ----------------
     if (project.sourceType === 'url') {
       const target = project.sourceUrl!
+      const config = project.config ? parseConfig(project.config) : undefined
       await withDbRetry(() =>
         db.run.update({
           where: { id: runId },
@@ -285,7 +320,7 @@ async function executeRun(runId: string): Promise<void> {
       )
       await addEvent(runId, 'ngrok.connected', `target URL: ${target}`, { url: target })
       await notify(runId, project.name, 'run.ready', target)
-      await runVerification(runId, target, target, abort.signal)
+      await runVerification(runId, target, target, abort.signal, runOpts?.configOverride || config, runOpts)
       await setStatus(runId, 'COMPLETED')
       await finalizeRun(runId)
       return
@@ -383,7 +418,7 @@ async function executeRun(runId: string): Promise<void> {
 
     // ---------------- VERIFICATION ----------------
     const targetUrl = tunnel.ok ? tunnel.url! : `http://127.0.0.1:${handle.port}`
-    await runVerification(runId, targetUrl, `http://127.0.0.1:${handle.port}`, abort.signal, config)
+    await runVerification(runId, targetUrl, `http://127.0.0.1:${handle.port}`, abort.signal, runOpts?.configOverride || config, runOpts)
 
     // ---------------- COMPLETED ----------------
     await setStatus(runId, 'COMPLETED')
@@ -415,27 +450,37 @@ async function runVerification(
   targetUrl: string,
   internalUrl: string,
   signal: AbortSignal,
-  configOverride?: VerifyHubConfig
+  configOverride?: VerifyHubConfig,
+  runOpts?: { engine?: string; browser?: string; recordVideo?: boolean; instructions?: string[] }
 ): Promise<void> {
   const run = await db.run.findUniqueOrThrow({ where: { id: runId }, include: { project: true } })
   await setStatus(runId, 'KANE_VERIFYING')
 
   const cfg = configOverride || (run.project.config ? parseConfig(run.project.config) : undefined)
-  const instructions = cfg?.verification?.instructions || ['Open homepage', 'Test navigation']
+  const instructions = runOpts?.instructions || cfg?.verification?.instructions || ['Open homepage', 'Test navigation']
   const timeoutSeconds = cfg?.verification?.timeoutSeconds || 120
-  const requestedEngine = cfg?.verification?.engine || 'kane'
+  const requestedEngine = runOpts?.engine || cfg?.verification?.engine || 'auto'
+  const browserName = ((runOpts?.browser || (cfg?.verification as any)?.browser || 'firefox')) as 'firefox' | 'chromium' | 'webkit'
+  const recordVideo = runOpts?.recordVideo !== undefined ? runOpts.recordVideo : ((cfg?.verification as any)?.recordVideo !== false)
 
-  const { engine, fallbackFrom } = await resolveEngine(requestedEngine)
+  const { engine, fallbackFrom, fallbackReason, diagnostics } = await resolveEngine(requestedEngine, {
+    browserName,
+    recordVideo,
+  })
   if (fallbackFrom) {
     await addEvent(
       runId,
       'kane.started',
-      `${fallbackFrom} unavailable — falling back to the ${engine.name} engine`,
-      { requested: fallbackFrom, engine: engine.name },
+      `${fallbackFrom} unavailable — falling back to ${engine.name}${fallbackReason ? ` (${fallbackReason})` : ''}`,
+      { requested: fallbackFrom, engine: engine.name, fallbackReason, diagnostics },
       'info'
     )
   } else {
-    await addEvent(runId, 'kane.started', `Verification started with ${engine.name}`, { engine: engine.name })
+    await addEvent(runId, 'kane.started', `Verification started with ${engine.name} (${browserName})`, {
+      engine: engine.name,
+      browser: browserName,
+      diagnostics,
+    })
   }
 
   const session = await withDbRetry(() =>
@@ -518,7 +563,8 @@ async function runVerification(
                 label: e.label,
                 content: e.content,
                 mimeType: e.mimeType,
-                size: e.content ? e.content.length : 0,
+                size: (e as any).size ?? (e.content ? e.content.length : 0),
+                path: (e as any).path || null,
               },
             })
           )
@@ -690,6 +736,40 @@ async function notify(
         error: res.error,
       },
     })
+
+    // If verification completed/failed, deliver key evidence (screenshots, video, report)
+    if (kind === 'run.completed' || kind === 'run.failed') {
+      try {
+        const evidenceDir = store.runEvidenceDir(runId)
+        // 1. Send up to 2 key screenshots
+        const screenshotsDir = path.join(evidenceDir, 'screenshots')
+        if (fs.existsSync(screenshotsDir)) {
+          const files = fs.readdirSync(screenshotsDir).filter((f) => f.endsWith('.png'))
+          for (const f of files.slice(0, 2)) {
+            const shotPath = path.join(screenshotsDir, f)
+            await telegramSendPhoto(chatId, shotPath, `📸 Screenshot: ${f.replace(/_\d+\.png$/, '')}`)
+          }
+        }
+
+        // 2. Send video recording if present
+        const videosDir = path.join(evidenceDir, 'videos')
+        if (fs.existsSync(videosDir)) {
+          const vFiles = fs.readdirSync(videosDir).filter((f) => f.endsWith('.webm') || f.endsWith('.mp4'))
+          if (vFiles.length > 0) {
+            const videoPath = path.join(videosDir, vFiles[0])
+            await telegramSendVideo(chatId, videoPath, `🎥 Full browser verification recording (#${run.number})`)
+          }
+        }
+
+        // 3. Send HTML report document
+        const reportPath = path.join(evidenceDir, 'reports', 'report.html')
+        if (fs.existsSync(reportPath)) {
+          await telegramSendDocument(chatId, reportPath, `📊 Interactive Verification Report (#${run.number})`)
+        }
+      } catch (mediaErr) {
+        console.warn(`[telegram] Non-fatal error delivering media evidence:`, mediaErr)
+      }
+    }
   } catch (err) {
     await db.notification
       .create({

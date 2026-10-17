@@ -378,18 +378,27 @@ export class KaneCliEngine implements VerificationEngine {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Registry
-// ---------------------------------------------------------------------------
+import { PlaywrightEngine, type PlaywrightEngineOptions } from './playwright-engine'
+export { PlaywrightEngine, type PlaywrightEngineOptions }
 
 export const ENGINES: Record<string, VerificationEngine> = {
   kane: new KaneCliEngine(),
+  playwright: new PlaywrightEngine(),
   'http-probe': new HttpProbeEngine(),
 }
 
-export async function resolveEngine(requested: string | undefined): Promise<{ engine: VerificationEngine; fallbackFrom?: string }> {
-  const wanted = ENGINES[requested || 'kane']
-  if (wanted && (await wanted.available())) return { engine: wanted }
-  if (wanted) return { engine: ENGINES['http-probe'], fallbackFrom: requested || 'kane' }
-  return { engine: ENGINES['http-probe'], fallbackFrom: requested }
+export async function resolveEngine(
+  requested: string | undefined,
+  options?: import('./playwright-engine').PlaywrightEngineOptions
+): Promise<{ engine: VerificationEngine; fallbackFrom?: string; fallbackReason?: string; diagnostics?: string[] }> {
+  const { engineManager } = await import('./engine-manager')
+  const res = await engineManager.resolve(requested, options)
+  return {
+    engine: res.engine,
+    fallbackFrom: res.fallbackFrom,
+    fallbackReason: res.fallbackReason,
+    diagnostics: res.diagnostics,
+  }
 }
+
+

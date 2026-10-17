@@ -43,31 +43,59 @@ export async function POST(req: NextRequest) {
     }
 
     // ------------------------------------------------------------------
-    // GitHub
+    // Git repository (GitHub, GitLab, Bitbucket, self-hosted, .git)
     // ------------------------------------------------------------------
-    if (body.sourceType === 'github') {
+    if (body.sourceType === 'github' || body.sourceType === ('git' as any)) {
       const raw = (body.sourceUrl || '').trim()
-      const m = /^https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+)/i.exec(raw) || /^([\w.-]+)\/([\w.-]+)$/.exec(raw)
-      if (!m) {
+      if (!raw) {
         return NextResponse.json(
-          { error: 'provide a GitHub repository URL like https://github.com/owner/repo' },
+          { error: 'provide a Git repository URL (e.g. https://github.com/owner/repo or any git URL)' },
           { status: 400 }
         )
       }
-      const ownerRepo = `${m[1]}/${m[2].replace(/\.git$/, '')}`
-      const info = await getPublicRepo(ownerRepo)
-      if (!info) {
-        return NextResponse.json({ error: `repository ${ownerRepo} not found or inaccessible` }, { status: 404 })
+      const ghMatch = /^https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+)/i.exec(raw) || /^([\w.-]+)\/([\w.-]+)$/.exec(raw)
+      if (ghMatch) {
+        const ownerRepo = `${ghMatch[1]}/${ghMatch[2].replace(/\.git$/, '')}`
+        let repoName = ghMatch[2].replace(/\.git$/, '')
+        let branch = body.branch || 'main'
+        let description: string | null = null
+        try {
+          const info = await getPublicRepo(ownerRepo)
+          if (info) {
+            repoName = info.name
+            branch = body.branch || info.default_branch
+            description = info.description || null
+          }
+        } catch {
+          // GitHub API rate limit or offline — fallback to repo name
+        }
+        const project = await db.project.create({
+          data: {
+            name: body.name?.trim() || repoName,
+            description: description || `Git repository ${ownerRepo}`,
+            sourceType: 'github',
+            sourceUrl: raw.startsWith('http') ? raw : `https://github.com/${ownerRepo}`,
+            gitRepo: ownerRepo,
+            gitBranch: branch,
+            config: body.config || null,
+          },
+        })
+        return NextResponse.json({ project }, { status: 201 })
       }
-      const branch = body.branch || info.default_branch
+
+      // Non-GitHub Git URL (GitLab, Bitbucket, self-hosted, direct .git URL)
+      const cleanUrl = raw.replace(/\.git$/i, '')
+      const parts = cleanUrl.split('/')
+      const repoName = parts[parts.length - 1] || 'git-project'
+      const ownerRepo = parts.slice(-2).join('/')
       const project = await db.project.create({
         data: {
-          name: body.name?.trim() || info.name,
-          description: info.description || null,
+          name: body.name?.trim() || repoName,
+          description: `Git repository (${cleanUrl})`,
           sourceType: 'github',
-          sourceUrl: info.html_url,
-          gitRepo: ownerRepo,
-          gitBranch: branch,
+          sourceUrl: raw,
+          gitRepo: ownerRepo || repoName,
+          gitBranch: body.branch?.trim() || 'main',
           config: body.config || null,
         },
       })
@@ -135,7 +163,7 @@ export async function POST(req: NextRequest) {
       const root = findProjectRoot(dest)
       const d = detectProject(root)
       const cfgPath = path.join(root, '.verifyhub.yml')
-      await db.project.update({
+      const updated = await db.project.update({
         where: { id: project.id },
         data: {
           detectedLanguage: d.language,
@@ -148,8 +176,11 @@ export async function POST(req: NextRequest) {
           config: fs.existsSync(cfgPath) ? fs.readFileSync(cfgPath, 'utf8') : null,
         },
       })
+      return NextResponse.json({ project: updated, detection: d }, { status: 201 })
+    }
+
     // ------------------------------------------------------------------
-    // Direct code (e.g. index.html or raw code snippet)
+    // Direct code / HTML snippet
     // ------------------------------------------------------------------
     if (body.sourceType === ('code' as any)) {
       const code = ((body as any).code || '').trim()
@@ -160,7 +191,7 @@ export async function POST(req: NextRequest) {
       const isHtml = /\.html?$/i.test(fileName)
       const project = await db.project.create({
         data: {
-          name: body.name?.trim() || (isHtml ? 'HTML Project' : 'Code Project'),
+          name: body.name?.trim() || (isHtml ? 'Interactive Web App' : 'Code Project'),
           description: `Direct code (${fileName})`,
           sourceType: 'upload',
           config: body.config || null,
@@ -175,7 +206,7 @@ export async function POST(req: NextRequest) {
       const root = findProjectRoot(dest)
       const d = detectProject(root)
       const cfgPath = path.join(root, '.verifyhub.yml')
-      await db.project.update({
+      const updated = await db.project.update({
         where: { id: project.id },
         data: {
           detectedLanguage: d.language,
@@ -188,7 +219,56 @@ export async function POST(req: NextRequest) {
           config: fs.existsSync(cfgPath) ? fs.readFileSync(cfgPath, 'utf8') : null,
         },
       })
-      return NextResponse.json({ project }, { status: 201 })
+      return NextResponse.json({ project: updated, detection: d }, { status: 201 })
+    }
+
+    // ------------------------------------------------------------------
+    // Local directory on host machine
+    // ------------------------------------------------------------------
+    if (body.sourceType === ('local' as any)) {
+      const localPath = ((body as any).localPath || '').trim()
+      if (!localPath) {
+        return NextResponse.json({ error: 'local folder path is required' }, { status: 400 })
+      }
+      const resolvedPath = path.resolve(localPath)
+      if (!fs.existsSync(resolvedPath)) {
+        return NextResponse.json({ error: `folder does not exist at "${localPath}"` }, { status: 404 })
+      }
+      const stat = fs.statSync(resolvedPath)
+      if (!stat.isDirectory()) {
+        return NextResponse.json({ error: `path "${localPath}" is not a directory` }, { status: 400 })
+      }
+      const projectName = body.name?.trim() || path.basename(resolvedPath) || 'Local Project'
+      const project = await db.project.create({
+        data: {
+          name: projectName,
+          description: `Imported from local folder: ${resolvedPath}`,
+          sourceType: 'upload',
+          localPath: resolvedPath,
+          config: body.config || null,
+        },
+      })
+      const dest = store.projectDir(project.id)
+      fs.mkdirSync(dest, { recursive: true })
+      store.copyDirRecursive(resolvedPath, dest)
+
+      const root = findProjectRoot(dest)
+      const d = detectProject(root)
+      const cfgPath = path.join(root, '.verifyhub.yml')
+      const updated = await db.project.update({
+        where: { id: project.id },
+        data: {
+          detectedLanguage: d.language,
+          detectedFramework: d.framework,
+          detectedPackageManager: d.packageManager,
+          detectedInstall: d.installCommand || null,
+          detectedBuild: d.buildCommand || null,
+          detectedStart: d.startCommand || null,
+          detectedPort: d.port || null,
+          config: fs.existsSync(cfgPath) ? fs.readFileSync(cfgPath, 'utf8') : null,
+        },
+      })
+      return NextResponse.json({ project: updated, detection: d }, { status: 201 })
     }
 
     return NextResponse.json({ error: 'unsupported sourceType' }, { status: 400 })

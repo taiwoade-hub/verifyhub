@@ -76,6 +76,42 @@ export function extractTarball(tarPath: string, destDir: string): { root: string
   return { root: destDir, fileCount }
 }
 
+export function copyDirRecursive(src: string, dest: string, maxFiles = 10_000): number {
+  fs.mkdirSync(dest, { recursive: true })
+  let count = 0
+  const walk = (from: string, to: string, depth: number) => {
+    if (depth > 12 || count >= maxFiles) return
+    let entries: fs.Dirent[]
+    try {
+      entries = fs.readdirSync(from, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      if (IGNORED.has(entry.name) || entry.name.startsWith('.')) continue
+      const srcPath = path.join(from, entry.name)
+      const destPath = path.join(to, entry.name)
+      if (entry.isDirectory()) {
+        try {
+          fs.mkdirSync(destPath, { recursive: true })
+          walk(srcPath, destPath, depth + 1)
+        } catch {
+          /* ignore */
+        }
+      } else if (entry.isFile()) {
+        try {
+          fs.copyFileSync(srcPath, destPath)
+          count++
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+  walk(src, dest, 0)
+  return count
+}
+
 export interface FileNode {
   name: string
   path: string

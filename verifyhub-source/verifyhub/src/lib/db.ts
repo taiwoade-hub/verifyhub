@@ -23,9 +23,9 @@ export async function ensureDbReady(): Promise<void> {
       try {
         await db.$connect()
         // Journal mode DELETE/TRUNCATE disables SQLite WAL mode -shm shared-memory mapping which fails on WSL /mnt mounts
-        await db.$executeRawUnsafe('PRAGMA journal_mode = DELETE;')
-        await db.$executeRawUnsafe('PRAGMA busy_timeout = 10000;')
-        await db.$executeRawUnsafe('PRAGMA synchronous = NORMAL;')
+        await db.$queryRawUnsafe('PRAGMA journal_mode = DELETE;')
+        await db.$queryRawUnsafe('PRAGMA busy_timeout = 10000;')
+        await db.$queryRawUnsafe('PRAGMA synchronous = NORMAL;')
       } catch (err) {
         console.warn('[db] SQLite pragma initialization note:', err)
       }
@@ -59,8 +59,8 @@ export async function withDbRetry<T>(fn: () => Promise<T>, maxRetries = 5, baseD
         err?.code === 'P2028'
       if (isLockOrIo && attempt < maxRetries - 1) {
         try {
-          await db.$executeRawUnsafe('PRAGMA journal_mode = DELETE;')
-          await db.$executeRawUnsafe('PRAGMA busy_timeout = 10000;')
+          await db.$queryRawUnsafe('PRAGMA journal_mode = DELETE;')
+          await db.$queryRawUnsafe('PRAGMA busy_timeout = 10000;')
         } catch {}
         await new Promise((resolve) => setTimeout(resolve, baseDelayMs * Math.pow(1.5, attempt) + Math.random() * 50))
         continue

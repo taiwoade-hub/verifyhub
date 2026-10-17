@@ -27,3 +27,13 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Databases & Runtime Data
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+**/prisma/*.db
+**/prisma/*.db-journal
+**/verifyhub-data/
+verifyhub-data/

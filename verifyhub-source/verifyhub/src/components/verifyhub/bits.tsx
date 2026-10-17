@@ -138,7 +138,7 @@ export function PageHeader({ title, description, children }: {
 }
 
 export function Panel({ title, right, children, className, bodyClass }: {
-  title?: string
+  title?: ReactNode
   right?: ReactNode
   children: ReactNode
   className?: string
@@ -148,7 +148,7 @@ export function Panel({ title, right, children, className, bodyClass }: {
     <section className={cn('rounded-lg border border-border bg-[#111114]', className)}>
       {title && (
         <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">{title}</h3>
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">{title}</div>
           {right}
         </div>
       )}

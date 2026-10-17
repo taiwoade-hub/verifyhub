@@ -52,3 +52,12 @@ prompt
 server.log
 # Skills directory
 /skills/
+
+# Databases & Runtime Data
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+prisma/*.db
+prisma/*.db-journal
+verifyhub-data/

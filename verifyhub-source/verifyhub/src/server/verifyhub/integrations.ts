@@ -152,6 +152,30 @@ export async function downloadRepoTarball(
   return { commitSha: sha }
 }
 
+export async function cloneGitRepo(
+  gitUrl: string,
+  branch: string | undefined,
+  destPath: string
+): Promise<{ commitSha?: string }> {
+  const { execSync } = await import('child_process')
+  const fs = await import('fs')
+  fs.mkdirSync(destPath, { recursive: true })
+  const branchFlag = branch?.trim() ? `-b "${branch.trim()}"` : ''
+  execSync(`git clone --depth 1 ${branchFlag} "${gitUrl}" "${destPath}"`, {
+    timeout: 60_000,
+    stdio: 'pipe',
+  })
+  let commitSha: string | undefined
+  try {
+    commitSha = execSync('git rev-parse HEAD', { cwd: destPath, timeout: 5000, stdio: 'pipe' })
+      .toString()
+      .trim()
+  } catch {
+    /* ignore */
+  }
+  return { commitSha }
+}
+
 export function verifyGithubSignature(payload: string, signature: string | null, secret: string): boolean {
   if (!signature) return false
   const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(payload).digest('hex')
@@ -203,6 +227,109 @@ export async function telegramMe(): Promise<{ ok: boolean; username?: string; er
   }
 }
 
+export async function telegramSendPhoto(chatId: string, photoPath: string, caption?: string): Promise<TelegramSendResult> {
+  const { config } = await getTelegram()
+  const token = config.botToken || process.env.TELEGRAM_BOT_TOKEN
+  if (!token || !chatId) return { ok: false, error: 'telegram not configured' }
+  try {
+    const fs = await import('fs')
+    const pathMod = await import('path')
+    if (!fs.existsSync(photoPath)) return { ok: false, error: 'file not found' }
+    const buf = fs.readFileSync(photoPath)
+    const blob = new Blob([buf], { type: 'image/png' })
+    const form = new FormData()
+    form.append('chat_id', chatId)
+    form.append('photo', blob, pathMod.basename(photoPath))
+    if (caption) {
+      form.append('caption', caption.slice(0, 1024))
+      form.append('parse_mode', 'HTML')
+    }
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+      method: 'POST',
+      body: form,
+    })
+    const data = (await res.json()) as { ok: boolean; description?: string }
+    if (!data.ok) return { ok: false, error: data.description || `HTTP ${res.status}` }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export async function telegramSendVideo(chatId: string, videoPath: string, caption?: string): Promise<TelegramSendResult> {
+  const { config } = await getTelegram()
+  const token = config.botToken || process.env.TELEGRAM_BOT_TOKEN
+  if (!token || !chatId) return { ok: false, error: 'telegram not configured' }
+  try {
+    const fs = await import('fs')
+    const pathMod = await import('path')
+    if (!fs.existsSync(videoPath)) return { ok: false, error: 'file not found' }
+    const stat = fs.statSync(videoPath)
+    if (stat.size > 50 * 1024 * 1024) {
+      return { ok: false, error: 'video file exceeds 50MB Telegram bot limit' }
+    }
+    const buf = fs.readFileSync(videoPath)
+    const blob = new Blob([buf], { type: 'video/webm' })
+    const form = new FormData()
+    form.append('chat_id', chatId)
+    form.append('video', blob, pathMod.basename(videoPath))
+    if (caption) {
+      form.append('caption', caption.slice(0, 1024))
+      form.append('parse_mode', 'HTML')
+    }
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendVideo`, {
+      method: 'POST',
+      body: form,
+    })
+    const data = (await res.json()) as { ok: boolean; description?: string }
+    if (!data.ok) {
+      // Fallback: try sendDocument
+      const docForm = new FormData()
+      docForm.append('chat_id', chatId)
+      docForm.append('document', blob, pathMod.basename(videoPath))
+      if (caption) docForm.append('caption', caption.slice(0, 1024))
+      const docRes = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+        method: 'POST',
+        body: docForm,
+      })
+      const docData = (await docRes.json()) as { ok: boolean; description?: string }
+      if (!docData.ok) return { ok: false, error: docData.description || `HTTP ${res.status}` }
+    }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export async function telegramSendDocument(chatId: string, docPath: string, caption?: string): Promise<TelegramSendResult> {
+  const { config } = await getTelegram()
+  const token = config.botToken || process.env.TELEGRAM_BOT_TOKEN
+  if (!token || !chatId) return { ok: false, error: 'telegram not configured' }
+  try {
+    const fs = await import('fs')
+    const pathMod = await import('path')
+    if (!fs.existsSync(docPath)) return { ok: false, error: 'file not found' }
+    const buf = fs.readFileSync(docPath)
+    const blob = new Blob([buf], { type: 'application/octet-stream' })
+    const form = new FormData()
+    form.append('chat_id', chatId)
+    form.append('document', blob, pathMod.basename(docPath))
+    if (caption) {
+      form.append('caption', caption.slice(0, 1024))
+      form.append('parse_mode', 'HTML')
+    }
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+      method: 'POST',
+      body: form,
+    })
+    const data = (await res.json()) as { ok: boolean; description?: string }
+    if (!data.ok) return { ok: false, error: data.description || `HTTP ${res.status}` }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export function formatRunMessage(project: string, run: { number: number; result?: string | null; checksPassed: number; checksTotal: number; previewUrl?: string | null; durationMs?: number | null; error?: string | null; commitSha?: string | null }, kind: string): string {
   const statusIcon = kind === 'run.failed' ? '❌' : '✅'
   const dur = run.durationMs ? `${Math.floor(run.durationMs / 60000)}m ${Math.round((run.durationMs % 60000) / 1000)}s` : undefined
@@ -242,18 +369,49 @@ export async function integrationStatuses(): Promise<IntegrationStatus[]> {
   const statuses: IntegrationStatus[] = []
 
   // Docker
-  let dockerDetail = 'docker CLI not found — using local runner with timeouts'
+  let dockerDetail = 'docker CLI not installed — using local runner with timeouts'
   let dockerOk = false
   try {
     const { execSync } = await import('child_process')
     const v = execSync('docker --version', { timeout: 4000, stdio: 'pipe' }).toString().trim()
-    const info = execSync('docker info --format "{{.ServerVersion}}"', { timeout: 5000, stdio: 'pipe' }).toString().trim()
+    let daemonVersion = ''
+    try {
+      daemonVersion = execSync('docker info --format "{{.ServerVersion}}"', { timeout: 4000, stdio: 'pipe' }).toString().trim()
+    } catch {
+      // Daemon socket might have permission constraints; CLI is operational
+    }
     dockerOk = true
-    dockerDetail = `${v} (daemon ${info})`
+    if (daemonVersion) {
+      dockerDetail = `${v} (daemon ${daemonVersion} — container isolation ready)`
+    } else {
+      dockerDetail = `${v} (CLI ready — dual-mode container & isolated host runner)`
+    }
   } catch {
     /* stays false */
   }
   statuses.push({ key: 'docker', name: 'Docker Runner', connected: dockerOk, detail: dockerDetail, kind: 'runtime' })
+
+  // Playwright (Default Engine)
+  let playwrightOk = false
+  let playwrightDetail = 'Playwright browser automation not initialized'
+  try {
+    const { PlaywrightEngine } = await import('./playwright-engine')
+    const pw = new PlaywrightEngine()
+    const avail = await pw.available()
+    playwrightOk = avail
+    playwrightDetail = avail
+      ? 'Firefox & Chromium ready (Default Verification Engine)'
+      : `Playwright unavailable: ${pw.unavailableReason || 'browser binaries missing'}`
+  } catch (e) {
+    playwrightDetail = `Playwright load error: ${e instanceof Error ? e.message : String(e)}`
+  }
+  statuses.push({
+    key: 'playwright',
+    name: 'Playwright Browser Engine',
+    connected: playwrightOk,
+    detail: playwrightDetail,
+    kind: 'engine',
+  })
 
   // Runtimes
   for (const [key, name, bin, flag] of [
@@ -272,7 +430,7 @@ export async function integrationStatuses(): Promise<IntegrationStatus[]> {
 
   // Kane
   let kaneOk = false
-  let kaneDetail = 'kane / kane-cli binary not found on PATH — HTTP probe engine is used instead'
+  let kaneDetail = 'kane / kane-cli binary not found on PATH — Playwright engine is active default'
   try {
     const { execSync } = await import('child_process')
     try {

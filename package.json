@@ -1,0 +1,13 @@
+{
+  "name": "verifyhub-root",
+  "version": "0.2.1",
+  "private": true,
+  "scripts": {
+    "dev": "cd verifyhub-source/verifyhub && npm run dev",
+    "build": "cd verifyhub-source/verifyhub && npm run build",
+    "start": "cd verifyhub-source/verifyhub && npm run start",
+    "lint": "cd verifyhub-source/verifyhub && npm run lint",
+    "db:push": "cd verifyhub-source/verifyhub && npm run db:push",
+    "db:generate": "cd verifyhub-source/verifyhub && npm run db:generate"
+  }
+}

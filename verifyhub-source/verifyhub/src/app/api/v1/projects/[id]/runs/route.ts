@@ -12,7 +12,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const project = await db.project.findUnique({ where: { id } })
   if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
 
-  const body = (await req.json().catch(() => ({}))) as { branch?: string; commitSha?: string }
+  const body = (await req.json().catch(() => ({}))) as {
+    branch?: string
+    commitSha?: string
+    engine?: string
+    browser?: string
+    recordVideo?: boolean
+    instructions?: string[]
+  }
 
   // refuse to stack more than 2 concurrent active runs per project
   const active = await db.run.count({
@@ -26,6 +33,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   ensureScheduler()
-  const run = await createRun(id, { trigger: 'manual', branch: body.branch, commitSha: body.commitSha })
+  const run = await createRun(id, {
+    trigger: 'manual',
+    branch: body.branch,
+    commitSha: body.commitSha,
+    engine: body.engine,
+    browser: body.browser,
+    recordVideo: body.recordVideo,
+    instructions: body.instructions,
+  })
   return NextResponse.json({ run }, { status: 201 })
 }

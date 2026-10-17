@@ -81,6 +81,7 @@ export interface Evidence {
   content?: string | null
   mimeType?: string | null
   size?: number | null
+  path?: string | null
   createdAt: string
 }
 

@@ -27,3 +27,80 @@ export async function GET(req: NextRequest) {
   })
   return NextResponse.json({ runs })
 }
+
+export async function POST(req: NextRequest) {
+  try {
+    ensureScheduler()
+    const body = (await req.json().catch(() => ({}))) as {
+      projectId?: string
+      url?: string
+      name?: string
+      engine?: string
+      browser?: string
+      recordVideo?: boolean
+      instructions?: string[]
+      branch?: string
+      commitSha?: string
+    }
+
+    let projectId = body.projectId
+    if (!projectId && body.url) {
+      const raw = body.url.trim()
+      let parsedUrl: URL
+      try {
+        parsedUrl = new URL(raw)
+      } catch {
+        return NextResponse.json({ error: 'invalid URL' }, { status: 400 })
+      }
+      if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+        return NextResponse.json({ error: 'URL must use http or https' }, { status: 400 })
+      }
+      const host = parsedUrl.hostname
+      if (/^(localhost|127\.|0\.|10\.|192\.168\.|169\.254\.)/.test(host) || host === '::1') {
+        return NextResponse.json(
+          { error: 'internal addresses are not allowed for live URL verification' },
+          { status: 400 }
+        )
+      }
+
+      // Check if project already exists for this URL
+      let project = await db.project.findFirst({
+        where: { sourceType: 'url', sourceUrl: parsedUrl.toString() },
+      })
+      if (!project) {
+        project = await db.project.create({
+          data: {
+            name: body.name?.trim() || parsedUrl.hostname,
+            sourceType: 'url',
+            sourceUrl: parsedUrl.toString(),
+            config: `version: 1\nverification:\n  engine: ${body.engine || 'playwright'}\n  browser: ${body.browser || 'firefox'}\n  recordVideo: ${body.recordVideo !== false}\n`,
+          },
+        })
+      }
+      projectId = project.id
+    }
+
+    if (!projectId) {
+      return NextResponse.json({ error: 'either projectId or url is required' }, { status: 400 })
+    }
+
+    const { createRun } = await import('@/server/verifyhub/orchestrator')
+    const run = await createRun(projectId, {
+      trigger: 'api',
+      branch: body.branch,
+      commitSha: body.commitSha,
+      engine: body.engine,
+      browser: body.browser,
+      recordVideo: body.recordVideo,
+      instructions: body.instructions,
+    })
+
+    return NextResponse.json({ run, projectId }, { status: 201 })
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    )
+  }
+}
+

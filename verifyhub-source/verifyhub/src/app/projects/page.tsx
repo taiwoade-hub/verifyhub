@@ -15,9 +15,10 @@ import {
   ChevronRight,
   Loader2,
   GitBranch,
+  Plus,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Shell } from '@/components/verifyhub/shell'
+import { Shell, useShell } from '@/components/verifyhub/shell'
 import { Loading, ErrorNote, Empty, Mono, StatusBadge } from '@/components/verifyhub/bits'
 import { Button } from '@/components/ui/button'
 import { useApi, apiSend, fmtRelative, type Project, type Run } from '@/lib/vh-api'
@@ -102,6 +103,7 @@ function ProjectCard({ project, onRun, running }: { project: Project; onRun: (p:
 
 function ProjectsInner() {
   const router = useRouter()
+  const { openNew } = useShell()
   const { data, error, loading, refresh } = useApi<{ projects: Project[] }>('/api/v1/projects', 5000)
   const [runningId, setRunningId] = useState<string | null>(null)
 
@@ -128,7 +130,13 @@ function ProjectsInner() {
         <Empty
           icon={<FolderGit2 className="h-10 w-10" />}
           title="No projects yet"
-          hint="Add a GitHub repository, upload a ZIP, or point at a live URL — VerifyHub detects the stack and prepares a runnable environment automatically."
+          hint="Add a GitHub repository, folder, live URL, or interactive app — VerifyHub detects the stack and prepares a runnable environment automatically."
+          action={
+            <Button size="sm" onClick={openNew} className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500">
+              <Plus className="h-3.5 w-3.5" />
+              Add Verification
+            </Button>
+          }
         />
       )}
 
