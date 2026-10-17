@@ -484,7 +484,30 @@ export async function localStart(opts: RunnerStartOptions): Promise<RunnerHandle
   }
 }
 
+const cleanupTimers = new Map<string, NodeJS.Timeout>()
+
+export function scheduleCleanup(runId: string, delayMs = 20 * 60 * 1000): void {
+  if (cleanupTimers.has(runId)) {
+    clearTimeout(cleanupTimers.get(runId)!)
+  }
+  const timer = setTimeout(async () => {
+    cleanupTimers.delete(runId)
+    const handle = activeRuns.get(runId)
+    if (handle?.mode === 'docker') {
+      await dockerCleanup(runId)
+    } else {
+      await cleanup(runId)
+    }
+  }, delayMs)
+  if (timer.unref) timer.unref()
+  cleanupTimers.set(runId, timer)
+}
+
 export async function cleanup(runId: string): Promise<void> {
+  if (cleanupTimers.has(runId)) {
+    clearTimeout(cleanupTimers.get(runId)!)
+    cleanupTimers.delete(runId)
+  }
   const handle = activeRuns.get(runId)
   if (!handle) return
   activeRuns.delete(runId)
@@ -581,6 +604,10 @@ export async function dockerStart(opts: RunnerStartOptions): Promise<RunnerHandl
 }
 
 export async function dockerCleanup(runId: string): Promise<void> {
+  if (cleanupTimers.has(runId)) {
+    clearTimeout(cleanupTimers.get(runId)!)
+    cleanupTimers.delete(runId)
+  }
   const handle = activeRuns.get(runId)
   if (!handle) return
   activeRuns.delete(runId)

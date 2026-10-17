@@ -28,6 +28,7 @@ import {
   Copy,
   Check,
   Maximize2,
+  Minimize2,
   AlertCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -55,19 +56,18 @@ type ViewportMode = 'desktop' | 'tablet' | 'mobile'
 
 function LiveBrowser({ run }: { run: Run }) {
   const [nonce, setNonce] = useState(0)
+  const [isExpanded, setIsExpanded] = useState(false)
   const isExternalUrl = run.sourceType === 'url' || Boolean(run.previewUrl && !run.previewUrl.startsWith('/api/v1/preview/'))
-  const [activeTab, setActiveTab] = useState<BrowserTab>(() => (isExternalUrl ? 'video' : 'preview'))
+  const directUrl = run.previewUrl && /^https?:\/\//.test(run.previewUrl) ? run.previewUrl : null
+  const [activeTab, setActiveTab] = useState<BrowserTab>('preview')
   const [viewport, setViewport] = useState<ViewportMode>('desktop')
   const [selectedScreenshot, setSelectedScreenshot] = useState<string | null>(null)
 
   const verifying = run.status === 'KANE_VERIFYING' || isActiveRun(run.status)
 
   const src = useMemo(() => {
-    if (run.previewUrl && /^https?:\/\//.test(run.previewUrl)) return run.previewUrl
-    if (run.previewUrl && run.previewUrl.startsWith('/api/v1/preview/')) return run.previewUrl
-    if (run.status === 'COMPLETED' || isActiveRun(run.status)) return `/api/v1/preview/${run.id}/`
-    return null
-  }, [run.previewUrl, run.status, run.id])
+    return `/api/v1/preview/${run.id}/`
+  }, [run.id])
 
   // Extract media evidence
   const screenshots = useMemo(() => {
@@ -175,15 +175,27 @@ function LiveBrowser({ run }: { run: Run }) {
                 variant="ghost"
                 className="h-6 gap-1 px-2 text-[11px] text-zinc-400 hover:text-foreground"
                 onClick={() => setNonce((n) => n + 1)}
+                title="Reload Live Preview"
               >
                 <RefreshCw className="h-3 w-3" />
                 Reload
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 gap-1 px-2 text-[11px] text-zinc-400 hover:text-foreground"
+                onClick={() => setIsExpanded((e) => !e)}
+                title={isExpanded ? 'Collapse viewer' : 'Expand viewer'}
+              >
+                {isExpanded ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+                <span className="hidden sm:inline">{isExpanded ? 'Compact' : 'Expand'}</span>
               </Button>
               <a
                 href={src}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] text-zinc-400 hover:bg-zinc-800 hover:text-foreground"
+                className="inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] text-zinc-400 hover:bg-zinc-800 hover:text-foreground transition-colors"
+                title="Open in new window"
               >
                 <ExternalLink className="h-3 w-3" />
                 Open
@@ -275,31 +287,41 @@ function LiveBrowser({ run }: { run: Run }) {
       </div>
 
       {/* Main content display area */}
-      <div className="relative h-[420px] overflow-hidden bg-[#0a0a0c]">
+      <div className={cn("relative transition-all duration-300 overflow-hidden bg-[#0a0a0c]", isExpanded ? "h-[740px]" : "h-[540px]")}>
         {/* Tab 1: Live Preview (Iframe with Viewport Switching) */}
         {activeTab === 'preview' && (
           <div className="flex h-full w-full flex-col overflow-auto">
             {isExternalUrl && (
-              <div className="flex items-center justify-between border-b border-border/80 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">
-                <div className="flex items-center gap-1.5">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
-                  <span>External websites often block iframe embedding (X-Frame-Options: DENY).</span>
+              <div className="flex items-center justify-between border-b border-border/80 bg-zinc-900/90 px-3 py-1.5 text-xs text-zinc-300">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="flex h-2 w-2 rounded-full bg-emerald-400 shrink-0" />
+                  <span className="text-[11px] font-mono text-zinc-300 truncate max-w-xs sm:max-w-md">
+                    Target: {directUrl || run.previewUrl}
+                  </span>
+                  <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400 border border-emerald-500/20 shrink-0">
+                    Framing Shield Active
+                  </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('video')}
-                    className="rounded bg-amber-500/20 px-2 py-0.5 text-[11px] font-medium text-amber-200 hover:bg-amber-500/30"
-                  >
-                    Watch Full Recording
-                  </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {directUrl && (
+                    <a
+                      href={directUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 rounded bg-zinc-800 px-2 py-0.5 text-[11px] text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      Direct Target
+                    </a>
+                  )}
                   <a
-                    href={src || '#'}
+                    href={src}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded bg-zinc-800 px-2 py-0.5 text-[11px] text-zinc-300 hover:bg-zinc-700"
+                    className="inline-flex items-center gap-1 rounded bg-zinc-800 px-2 py-0.5 text-[11px] text-emerald-400 hover:bg-zinc-700 transition-colors"
                   >
-                    Open Live
+                    <Maximize2 className="h-3 w-3" />
+                    Popout
                   </a>
                 </div>
               </div>
@@ -319,7 +341,7 @@ function LiveBrowser({ run }: { run: Run }) {
                     src={src}
                     title="live preview"
                     className="h-full w-full border-0 bg-white"
-                    sandbox="allow-scripts allow-same-origin allow-forms"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"
                   />
                 </div>
               ) : (
@@ -439,14 +461,20 @@ function LiveBrowser({ run }: { run: Run }) {
         )}
       </div>
 
-      {run.previewUrl && /^https?:\/\//.test(run.previewUrl) && (
-        <div className="flex items-center justify-between border-t border-border px-3 py-1.5 text-xs">
-          <Mono className="text-[11px] text-emerald-400">{run.previewUrl}</Mono>
-          <span className="text-[11px] text-zinc-500">
-            {run.session?.engine === 'playwright' ? 'Playwright Automated Browser' : 'Proxy Tunnel'}
-          </span>
+      <div className="flex items-center justify-between border-t border-border px-3 py-1.5 text-xs">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="flex h-2 w-2 rounded-full bg-emerald-400 shrink-0" />
+          <Mono className="text-[11px] text-emerald-400 truncate">{src}</Mono>
+          {directUrl && (
+            <span className="text-[11px] text-zinc-500 hidden md:inline truncate">
+              (target: <a href={directUrl} target="_blank" rel="noreferrer" className="underline hover:text-zinc-300">{directUrl}</a>)
+            </span>
+          )}
         </div>
-      )}
+        <span className="text-[11px] text-zinc-500 shrink-0">
+          {verifying ? 'Live Runner Active' : 'VerifyHub Live Preview Proxy'}
+        </span>
+      </div>
     </Panel>
   )
 }

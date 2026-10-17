@@ -670,9 +670,8 @@ async function finalizeRun(runId: string, kind: 'ok' | 'error' = 'ok', errorMess
     },
   })
 
-  // cleanup runner + tunnel (evidence already persisted in DB)
-  await runner.cleanup(runId)
-  await runner.dockerCleanup(runId)
+  // Keep runner active for interactive live preview (idle cleanup after 20m)
+  runner.scheduleCleanup(runId, 20 * 60 * 1000)
   if (run.tunnelId) stopTunnel(run.tunnelId)
   await addEvent(runId, 'run.completed', `Run #${run.number} finished`, {
     result: run.result || (kind === 'error' ? 'error' : 'passed'),
