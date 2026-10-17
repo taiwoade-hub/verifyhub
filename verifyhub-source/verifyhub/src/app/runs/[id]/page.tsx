@@ -55,7 +55,8 @@ type ViewportMode = 'desktop' | 'tablet' | 'mobile'
 
 function LiveBrowser({ run }: { run: Run }) {
   const [nonce, setNonce] = useState(0)
-  const [activeTab, setActiveTab] = useState<BrowserTab>('preview')
+  const isExternalUrl = run.sourceType === 'url' || Boolean(run.previewUrl && !run.previewUrl.startsWith('/api/v1/preview/'))
+  const [activeTab, setActiveTab] = useState<BrowserTab>(() => (isExternalUrl ? 'video' : 'preview'))
   const [viewport, setViewport] = useState<ViewportMode>('desktop')
   const [selectedScreenshot, setSelectedScreenshot] = useState<string | null>(null)
 
@@ -277,33 +278,60 @@ function LiveBrowser({ run }: { run: Run }) {
       <div className="relative h-[420px] overflow-hidden bg-[#0a0a0c]">
         {/* Tab 1: Live Preview (Iframe with Viewport Switching) */}
         {activeTab === 'preview' && (
-          <div className="flex h-full w-full items-center justify-center overflow-auto p-2">
-            {src ? (
-              <div
-                className={cn(
-                  'h-full transition-all duration-300',
-                  viewport === 'desktop' && 'w-full',
-                  viewport === 'tablet' && 'w-[768px] rounded-lg border border-zinc-700/60 shadow-2xl overflow-hidden',
-                  viewport === 'mobile' && 'w-[375px] rounded-2xl border-4 border-zinc-700/80 shadow-2xl overflow-hidden'
-                )}
-              >
-                <iframe
-                  key={`${nonce}-${viewport}`}
-                  src={src}
-                  title="live preview"
-                  className="h-full w-full border-0 bg-white"
-                  sandbox="allow-scripts allow-same-origin allow-forms"
-                />
-              </div>
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-2 text-center p-6">
-                <MonitorPlay className="h-9 w-9 text-zinc-700" />
-                <p className="text-sm text-zinc-400">Live preview unavailable</p>
-                <p className="max-w-sm text-xs leading-relaxed text-zinc-600">
-                  Target site may be closed or proxy disconnected. Check the Session Video or Screenshots tab above for captured verification evidence.
-                </p>
+          <div className="flex h-full w-full flex-col overflow-auto">
+            {isExternalUrl && (
+              <div className="flex items-center justify-between border-b border-border/80 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">
+                <div className="flex items-center gap-1.5">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+                  <span>External websites often block iframe embedding (X-Frame-Options: DENY).</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('video')}
+                    className="rounded bg-amber-500/20 px-2 py-0.5 text-[11px] font-medium text-amber-200 hover:bg-amber-500/30"
+                  >
+                    Watch Full Recording
+                  </button>
+                  <a
+                    href={src || '#'}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded bg-zinc-800 px-2 py-0.5 text-[11px] text-zinc-300 hover:bg-zinc-700"
+                  >
+                    Open Live
+                  </a>
+                </div>
               </div>
             )}
+            <div className="flex flex-1 items-center justify-center p-2">
+              {src ? (
+                <div
+                  className={cn(
+                    'h-full transition-all duration-300',
+                    viewport === 'desktop' && 'w-full',
+                    viewport === 'tablet' && 'w-[768px] rounded-lg border border-zinc-700/60 shadow-2xl overflow-hidden',
+                    viewport === 'mobile' && 'w-[375px] rounded-2xl border-4 border-zinc-700/80 shadow-2xl overflow-hidden'
+                  )}
+                >
+                  <iframe
+                    key={`${nonce}-${viewport}`}
+                    src={src}
+                    title="live preview"
+                    className="h-full w-full border-0 bg-white"
+                    sandbox="allow-scripts allow-same-origin allow-forms"
+                  />
+                </div>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-2 text-center p-6">
+                  <MonitorPlay className="h-9 w-9 text-zinc-700" />
+                  <p className="text-sm text-zinc-400">Live preview unavailable</p>
+                  <p className="max-w-sm text-xs leading-relaxed text-zinc-600">
+                    Target site may be closed or proxy disconnected. Check the Session Video or Screenshots tab above for captured verification evidence.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

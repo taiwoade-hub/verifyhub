@@ -455,9 +455,18 @@ async function runVerification(
 ): Promise<void> {
   const run = await db.run.findUniqueOrThrow({ where: { id: runId }, include: { project: true } })
   await setStatus(runId, 'KANE_VERIFYING')
-
   const cfg = configOverride || (run.project.config ? parseConfig(run.project.config) : undefined)
-  const instructions = runOpts?.instructions || cfg?.verification?.instructions || ['Open homepage', 'Test navigation']
+  const defaultSteps = [
+    'Verify Target Health & Navigation',
+    'Human-Like Site Exploration & Smooth Scrolling',
+    'Interactive Elements & Controls Testing',
+    'Multi-Page Journey & Content Crawling',
+    'Responsive Multi-Device Verification',
+  ]
+  const userInstructions = runOpts?.instructions || cfg?.verification?.instructions
+  const instructions = (userInstructions && userInstructions.length > 0)
+    ? Array.from(new Set([...defaultSteps, ...userInstructions]))
+    : defaultSteps
   const timeoutSeconds = cfg?.verification?.timeoutSeconds || 120
   const requestedEngine = runOpts?.engine || cfg?.verification?.engine || 'auto'
   const browserName = ((runOpts?.browser || (cfg?.verification as any)?.browser || 'firefox')) as 'firefox' | 'chromium' | 'webkit'
@@ -524,17 +533,35 @@ async function runVerification(
       timeoutSeconds,
       signal,
       onStep: async (update) => {
-        const row = stepRows[update.index]
-        if (!row) return
-        try {
-          await withDbRetry(() =>
-            db.verificationStep.update({
-              where: { id: row.id },
-              data: { status: update.status, detail: update.detail, durationMs: update.durationMs },
-            })
-          )
-        } catch (err) {
-          console.warn(`[orchestrator] onStep update failed:`, err)
+        let row = stepRows[update.index]
+        if (!row) {
+          try {
+            row = await withDbRetry(() =>
+              db.verificationStep.create({
+                data: {
+                  sessionId: session.id,
+                  runId,
+                  index: update.index,
+                  name: update.name,
+                  status: update.status,
+                  detail: update.detail,
+                  durationMs: update.durationMs,
+                },
+              })
+            )
+            stepRows[update.index] = row
+          } catch {}
+        } else {
+          try {
+            await withDbRetry(() =>
+              db.verificationStep.update({
+                where: { id: row.id },
+                data: { status: update.status, detail: update.detail, durationMs: update.durationMs },
+              })
+            )
+          } catch (err) {
+            console.warn(`[orchestrator] onStep update failed:`, err)
+          }
         }
         try {
           await broadcastRun(runId, 'kane.action', {

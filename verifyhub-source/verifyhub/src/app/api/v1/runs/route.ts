@@ -45,7 +45,10 @@ export async function POST(req: NextRequest) {
 
     let projectId = body.projectId
     if (!projectId && body.url) {
-      const raw = body.url.trim()
+      let raw = body.url.trim()
+      if (raw && !/^https?:\/\//i.test(raw)) {
+        raw = 'https://' + raw
+      }
       let parsedUrl: URL
       try {
         parsedUrl = new URL(raw)

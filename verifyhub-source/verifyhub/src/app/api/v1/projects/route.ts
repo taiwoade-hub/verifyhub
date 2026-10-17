@@ -106,7 +106,10 @@ export async function POST(req: NextRequest) {
     // Existing live URL
     // ------------------------------------------------------------------
     if (body.sourceType === 'url') {
-      const raw = (body.sourceUrl || '').trim()
+      let raw = (body.sourceUrl || '').trim()
+      if (raw && !/^https?:\/\//i.test(raw)) {
+        raw = 'https://' + raw
+      }
       let url: URL
       try {
         url = new URL(raw)
